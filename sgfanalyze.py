@@ -46,19 +46,14 @@ def retry_analysis(fn):
 
 @retry_analysis
 def do_analyze(C, leela, pb):
-    leela.start()
     leela.reset()
     leela.goto_position()
     stats, move_list = leela.analyze()
     pb.increment()
-
-    leela.stop()
-
     return stats, move_list
 
 # @retry_analysis
 # def do_variations(C, leela, pb):
-#     leela.start()
 #     leela.reset()
 #     leela.goto_position()
 #     stats, move_list = leela.analyze()
@@ -66,7 +61,6 @@ def do_analyze(C, leela, pb):
 
 #     sorted_moves = sorted(move_list.keys(), key=lambda k: move_list[k]['visits'], reverse=True)
 #     sequences = [ explore_branch(leela, mv, options.depth, pb) for mv in sorted_moves[:options.num_branches] ]
-#     leela.stop()
 
 #     return stats, move_list, sequences
 
@@ -119,7 +113,7 @@ if __name__=='__main__':
     parser = optparse.OptionParser()
     parser.add_option('-m', '--starting-at-m', dest='analyze_start', default=0, type=int,
                       help="Analyze game starting at move M (default=0)", metavar="M")
-    parser.add_option('-n', '--ending-at-n', dest='analyze_end', default=0, type=int,
+    parser.add_option('-n', '--ending-at-n', dest='analyze_end', default=1000, type=int,
                       help="Analyze game ending at move N (default=1000)", metavar="N")
     parser.add_option('', '--analyze-threshold', dest='delta_sensitivity', default=0.02, type=float,
                       help="Display analysis on moves losing at least this much win rate (default=0.02)")
@@ -203,6 +197,7 @@ if __name__=='__main__':
         prev_analysis_comment = ""
         prev_lb_values = []
 
+        leela.start()
         while not C.atEnd:
             C.next()
             move_num += 1
@@ -287,8 +282,9 @@ if __name__=='__main__':
 
     except:
         print >>sys.stderr, "Failure in leela, reporting partial results...\n"
-        if options.verbosity > 0:
-            traceback.print_exc()
+        traceback.print_exc()
+    finally:
+        leela.stop()
 
     if options.win_graph:
         graph_winrates(collected_winrates, "black", options.win_graph)

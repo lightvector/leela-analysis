@@ -28,6 +28,7 @@ class CLI(object):
         self.executable = executable
         self.verbosity = verbosity
         self.board_size = board_size
+        self.p = None
 
     def convert_position(self, pos):
         abet = 'abcdefghijklmnopqrstuvwxyz'
@@ -104,14 +105,16 @@ class CLI(object):
         if self.verbosity > 0:
             print >>sys.stderr, "Stopping leela..."
 
-        p = self.p
-        p.stdin.write('exit\n')
-        try:
-            p.terminate()
-        except OSError:
-            pass
-        check_stream(p.stderr)
-        check_stream(p.stdout)
+        if self.p is not None:
+            p = self.p
+            self.p = None
+            p.stdin.write('exit\n')
+            try:
+                p.terminate()
+            except OSError:
+                pass
+            check_stream(p.stderr)
+            check_stream(p.stdout)
 
     def playmove(self, pos):
         p = self.p
