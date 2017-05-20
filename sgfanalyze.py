@@ -115,10 +115,14 @@ if __name__=='__main__':
                       help="Analyze game starting at move M (default=0)", metavar="M")
     parser.add_option('-n', '--ending-at-n', dest='analyze_end', default=1000, type=int,
                       help="Analyze game ending at move N (default=1000)", metavar="N")
+
     parser.add_option('', '--analyze-threshold', dest='delta_sensitivity', default=0.02, type=float,
                       help="Display analysis on moves losing at least this much win rate (default=0.02)")
     parser.add_option('', '--variations-threshold', dest='delta_sensitivity2', default=0.05, type=float,
                       help="Display variations on moves losing at least this much win rate (default=0.05)")
+
+    parser.add_option('', '--seconds-per-search', dest='seconds_per_search', default=10, type=float,
+                      help="How many seconds to use per search (default=10)")
 
     parser.add_option('-g', '--win-graph', dest='win_graph',
                       help="Graph the win rate of the selected player (Requires a move range with -m and -n)")
@@ -184,8 +188,9 @@ if __name__=='__main__':
     pb.start()
 
     leela = leela.CLI(board_size=SZ,
-                          executable=options.executable,
-                          verbosity=options.verbosity)
+                      executable=options.executable,
+                      seconds_per_search=options.seconds_per_search,
+                      verbosity=options.verbosity)
 
     collected_winrates = {}
     collected_best_moves = {}

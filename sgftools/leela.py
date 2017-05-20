@@ -23,11 +23,12 @@ def check_stream(fd):
     return ""
 
 class CLI(object):
-    def __init__(self, board_size, executable,verbosity):
+    def __init__(self, board_size, executable, seconds_per_search, verbosity):
         self.history=[]
         self.executable = executable
         self.verbosity = verbosity
         self.board_size = board_size
+        self.seconds_per_search = seconds_per_search + 1 #add one to account for lag time
         self.p = None
 
     def convert_position(self, pos):
@@ -97,6 +98,7 @@ class CLI(object):
 
         time.sleep(5)
         p.stdin.write('boardsize %d\n' % (self.board_size))
+        p.stdin.write('time_settings 0 %d 1\n' % (self.seconds_per_search))
         time.sleep(1)
         check_stream(p.stderr)
         check_stream(p.stdout)
@@ -155,6 +157,8 @@ class CLI(object):
             print >>sys.stderr, self.whoseturn(), "to play"
             print >>sys.stderr, self.boardstate()
 
+        p.stdin.write('time_left black %d 1\n' % (self.seconds_per_search))
+        p.stdin.write('time_left white %d 1\n' % (self.seconds_per_search))
         cmd = "genmove %s\n" % (self.whoseturn())
         p.stdin.write(cmd)
 
