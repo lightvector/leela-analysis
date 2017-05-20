@@ -121,6 +121,10 @@ if __name__=='__main__':
                       help="Analyze game starting at move M (default=0)", metavar="M")
     parser.add_option('-n', '--ending-at-n', dest='analyze_end', default=0, type=int,
                       help="Analyze game ending at move N (default=1000)", metavar="N")
+    parser.add_option('', '--analyze-threshold', dest='delta_sensitivity', default=0.02, type=float,
+                      help="Display analysis on moves losing at least this much win rate (default=0.02)")
+    parser.add_option('', '--variations-threshold', dest='delta_sensitivity2', default=0.05, type=float,
+                      help="Display variations on moves losing at least this much win rate (default=0.05)")
 
     parser.add_option('-g', '--win-graph', dest='win_graph',
                       help="Graph the win rate of the selected player (Requires a move range with -m and -n)")
@@ -152,12 +156,33 @@ if __name__=='__main__':
     if options.verbosity > 1:
         print >>sys.stderr, "Checkpoint dir:", base_dir
 
-    C = sgf.cursor()
+    comment_requests_analyze = {}
+    comment_requests_variations = {}
 
+    C = sgf.cursor()
     if 'SZ' in C.node.keys():
         SZ = int(C.node['SZ'].data[0])
     else:
         SZ = 19
+
+    move_num = -1
+    C = sgf.cursor()
+    while not C.atEnd:
+        C.next()
+        move_num += 1
+        if 'C' in C.node.keys():
+            if 'analyze' in C.node['C'].data[0]:
+                comment_requests_analyze[move_num] = True
+            if 'variations' in C.node['C'].data[0]:
+                comment_requests_variations[move_num] = True
+
+    #Clean out existing comments
+    C = sgf.cursor()
+    while not C.atEnd:
+        C.next()
+        cnode = C.node
+        if cnode.has_key('C'):
+            cnode['C'].data[0] = ""
 
     task_size=calculate_task_size(sgf, options.analyze_start, options.analyze_end)
     print >>sys.stderr, "Executing %d analysis steps" % (task_size)
@@ -174,6 +199,10 @@ if __name__=='__main__':
 
     try:
         move_num = -1
+        C = sgf.cursor()
+        prev_analysis_comment = ""
+        prev_lb_values = []
+
         while not C.atEnd:
             C.next()
             move_num += 1
@@ -187,9 +216,7 @@ if __name__=='__main__':
                 leela.add_move('black', this_move)
 
             current_player = leela.whoseturn()
-            comment_requests_analyze = 'C' in C.node.keys() and 'analyze' in C.node['C'].data[0]
-            comment_requests_variations = 'C' in C.node.keys() and 'variations' in C.node['C'].data[0]
-            if (move_num >= options.analyze_start and move_num <= options.analyze_end) or comment_requests_analyze:
+            if (move_num >= options.analyze_start and move_num <= options.analyze_end) or (move_num in comment_requests_analyze):
                 ckpt_hash = 'analyze_' + leela.history_hash()
                 ckpt_fn = os.path.join(base_dir, ckpt_hash)
                 if options.verbosity > 2:
@@ -203,6 +230,9 @@ if __name__=='__main__':
                 else:
                     stats, move_list = do_analyze(C, leela, pb)
 
+                with open(ckpt_fn, 'w') as ckpt_file:
+                    pickle.dump((stats, move_list), ckpt_file)
+
                 if 'winrate' in stats and stats['visits'] > 100:
                     collected_winrates[move_num] = (current_player, stats['winrate'])
                 if len(move_list) > 0 and 'winrate' in move_list[0]:
@@ -212,12 +242,24 @@ if __name__=='__main__':
                 delta = 0.0
                 if (move_num-1) in collected_best_moves:
                     if(this_move != collected_best_moves[move_num-1]):
-                       delta = collected_best_move_winrates[move_num-1] - stats['winrate']
+                       delta = stats['winrate'] - collected_best_move_winrates[move_num-1]
+                       delta = min(0.0, (-delta if leela.whoseturn() == "black" else delta))
 
-                annotations.format_analysis(C, leela.whoseturn(), stats, move_list, delta)
+                if(delta <= -options.delta_sensitivity):
+                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,stats,this_move)
+                    annotations.annotate_sgf(C, delta_comment, delta_lb_values)
 
-                with open(ckpt_fn, 'w') as ckpt_file:
-                    pickle.dump((stats, move_list), ckpt_file)
+
+                annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,SZ), [])
+
+                if (move_num-1) in comment_requests_analyze or delta <= -options.delta_sensitivity:
+                    C.previous()
+                    annotations.annotate_sgf(C, prev_analysis_comment, prev_lb_values)
+                    C.next()
+
+                (analysis_comment, lb_values) = annotations.format_analysis(stats, move_list)
+                prev_analysis_comment = analysis_comment
+                prev_lb_values = lb_values
 
             # if analysis_mode=='variations':
             #     ckpt_hash = ('analyze_%d_%d_' + leela.history_hash()) % (options.num_branches, options.depth)

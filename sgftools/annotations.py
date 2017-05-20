@@ -26,44 +26,70 @@ def format_variation(cursor, seq):
     mv_data = [('black' if color == 'white' else 'white', stats, mv_list) for color, _mv, stats, mv_list in seq]
     insert_sequence(cursor, mv_seq, mv_data, format_analysis)
 
-def format_analysis(cursor, color, stats, move_list, delta):
-    cnode = cursor.node
-    abet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+def format_pos(pos,board_size):
+    if len(pos) != 2:
+        return pos
+    return (pos[0] + str(board_size - (ord(pos[1]) - ord('a')))).upper()
 
+def format_winrate(stats,move_list,board_size):
+    comment = ""
+    if'winrate' in stats:
+        comment += "Overall black win%%: %.2f%%\n" % (stats['winrate'] * 100)
+
+    if len(move_list) > 0:
+        comment += "Leela's next move: %s\n" % format_pos(move_list[0]['pos'],board_size)
+    else:
+        comment += "\n"
+
+    return comment
+
+def format_delta_info(delta, stats, this_move):
+    comment = ""
+    LB_values = []
+    if(delta <= -0.10):
+        comment += "==========================\n"
+        comment += "BLUNDER!! (delta %.2f%%)\n" % (delta * 100)
+        comment += "==========================\n"
+        LB_values.append("%s:%s" % (this_move,":("))
+    elif(delta <= -0.04):
+        comment += "==========================\n"
+        comment += "MISTAKE! (delta %.2f%%)\n" % (delta * 100)
+        comment += "==========================\n"
+        LB_values.append("%s:%s" % (this_move,":("))
+    elif(delta <= -0.02):
+        comment += "==========================\n"
+        comment += "INACCURACY (delta %.2f%%)\n" % (delta * 100)
+        comment += "==========================\n"
+        LB_values.append("%s:%s" % (this_move,":("))
+    elif(delta <= -0.001):
+        comment += "(delta %.2f%%)\n" % (delta * 100)
+
+    comment += "\n"
+    return (comment,LB_values)
+
+def format_analysis(stats, move_list):
+    abet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     comment = ""
     if 'bookmoves' in stats:
-        comment += "Book move: %s\n" % (abet[0])
-        comment += "====================\n"
+        comment += "==========================\n"
         comment += "Considered %d/%d bookmoves\n" % (stats['bookmoves'], stats['positions'])
     else:
-        delta = delta if color == "black" else (-delta)
-        if(delta < -0.02):
-            comment += "INACCURACY (delta %.2f%%)\n" % (delta * 100)
-            comment += "\n"
-        elif(delta < -0.04):
-            comment += "MISTAKE! (delta %.2f%%)\n" % (delta * 100)
-            comment += "\n"
-        elif(delta < -0.08):
-            comment += "BLUNDER!! (delta %.2f%%)\n" % (delta * 100)
-            comment += "\n"
-        else:
-            comment += "\n"
-            comment += "\n"
-
-        comment += "Overall black win%%: %.2f%%\n" % (stats['winrate'] * 100)
-        comment += "Best move: %s\n" % ( abet[0] )
-        comment += "====================\n"
+        comment += "==========================\n"
         comment += "Visited %d nodes\n" % (stats['visits'])
         comment += "\n"
 
         for L, mv in zip(abet, move_list):
             comment += "%s -> Win%%: %.2f%% (%d visits) \n" % (L, mv['winrate'] * 100, mv['visits'])
 
+    LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list)]
+    return (comment,LB_values)
+
+def annotate_sgf(cursor, comment, LB_values):
+    cnode = cursor.node
     if cnode.has_key('C'):
-        cnode['C'].data[0] = comment
+        cnode['C'].data[0] += comment
     else:
         cnode.addProperty( cnode.makeProperty( 'C', [comment] ) )
 
-    LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list)]
     if len(LB_values) > 0:
         cnode.addProperty( cnode.makeProperty( 'LB', LB_values ) )
