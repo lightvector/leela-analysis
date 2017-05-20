@@ -45,44 +45,41 @@ def retry_analysis(fn):
     return wrapped
 
 @retry_analysis
-def do_analyze(C, leela, pb, tries):
+def do_analyze(C, leela, pb):
     leela.start()
-    for i in xrange(tries):
-        leela.reset()
-        leela.goto_position()
-        stats, move_list = leela.analyze()
+    leela.reset()
+    leela.goto_position()
+    stats, move_list = leela.analyze()
     pb.increment()
 
     sorted_moves = sorted(move_list.keys(), key=lambda k: move_list[k]['visits'], reverse=True)
-    sequences = [ explore_branch(leela, mv, options.depth, pb, tries) for mv in sorted_moves[:options.num_branches] ]
+    sequences = [ explore_branch(leela, mv, options.depth, pb) for mv in sorted_moves[:options.num_branches] ]
     leela.stop()
 
     return stats, move_list, sequences
 
 @retry_analysis
-def do_suggest(C, leela, pb, tries):
+def do_suggest(C, leela, pb):
     leela.start()
-    for i in xrange(tries):
-        leela.reset()
-        leela.goto_position()
-        stats, move_list = leela.analyze()
+    leela.reset()
+    leela.goto_position()
+    stats, move_list = leela.analyze()
     pb.increment()
 
     leela.stop()
 
     return stats, move_list
 
-def explore_branch(leela, mv, depth, pb, tries):
+def explore_branch(leela, mv, depth, pb):
     seq = []
 
     for i in xrange(depth):
         color = leela.whoseturn()
         leela.add_move(color, mv)
 
-        for j in xrange(tries):
-            leela.reset()
-            leela.goto_position()
-            stats, move_list = leela.analyze()
+        leela.reset()
+        leela.goto_position()
+        stats, move_list = leela.analyze()
 
         pb.increment()
         seq.append( (color, mv, stats, move_list) )
@@ -133,11 +130,6 @@ if __name__=='__main__':
     parser.add_option('-g', '--win-graph', dest='win_graph',
                       help="Graph the win rate of the selected player (Requires a move range with -m and -n)")
 
-    parser.add_option('-s', '--supplement', dest='analyze_same_position', metavar="R",
-                      default=1, type=int, help="Analyze the same position R times to generate a more thorough analysis")
-    parser.add_option('-l', '--limit', dest='eval_limit', default=None, type=int,
-                      help="Limit the number of evaluations (default: Unlimited)")
-
     parser.add_option('-v', '--verbosity', default=0, type=int,
                       help="Set the verbosity level, 0: progress only, 1: progress+status, 2: progress+status+state")
     parser.add_option('-x', '--executable', default='leela_090_macOS_opencl', 
@@ -179,7 +171,7 @@ if __name__=='__main__':
     pb = progressbar.ProgressBar(max_value=task_size)
     pb.start()
 
-    leela = leela.CLI(board_size=SZ, eval_limit=options.eval_limit,
+    leela = leela.CLI(board_size=SZ,
                           executable=options.executable,
                           verbosity=options.verbosity)
 
@@ -216,7 +208,7 @@ if __name__=='__main__':
                         stats, move_list, sequences = pickle.load(ckpt_file)
                     pb.increment( 1+sum(len(seq) for seq in sequences) )
                 else:
-                    stats, move_list, sequences = do_analyze(C, leela, pb, options.analyze_same_position)
+                    stats, move_list, sequences = do_analyze(C, leela, pb)
 
                 if 'winrate' in stats and stats['visits'] > 1000:
                     collected_winrates[move_num] = (current_player, stats['winrate'])
@@ -240,7 +232,7 @@ if __name__=='__main__':
                         stats, move_list = pickle.load(ckpt_file)
                         pb.increment()
                 else:
-                    stats, move_list = do_suggest(C, leela, pb, options.analyze_same_position)
+                    stats, move_list = do_suggest(C, leela, pb)
 
                 if 'winrate' in stats and stats['visits'] > 1000:
                     collected_winrates[move_num] = (current_player, stats['winrate'])

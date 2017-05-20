@@ -30,39 +30,27 @@ def format_analysis(cursor, color, stats, move_list):
     cnode = cursor.node
     abet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
+    comment = ""
     if 'bookmoves' in stats:
-        comment = "Considered %d/%d bookmoves\n" % (stats['bookmoves'], stats['positions'])
-        comment += "Stats for %s to play\n" % (color)
+        comment += "Book move: %s\n" % (abet[0])
         comment += "====================\n"
-
-        sorted_moves = sorted(move_list.keys(), key=lambda k: move_list[k]['visits'], reverse=True)
-        comment += "Chosen move:    %s\n" % ( abet[sorted_moves.index( stats['chosen'] )] )
-
-        for L, mv in zip(abet, sorted_moves):
-            vtext = "Visits: %d" % (move_list[mv]['visits'])
-            comment += "%s -> %20s  WinRate: %.4f\n" % (L, vtext, move_list[mv]['W'])
-
+        comment += "Considered %d/%d bookmoves\n" % (stats['bookmoves'], stats['positions'])
+        comment += "====================\n"
     else:
-        comment = "Visited %d nodes\n\n" % (stats['visits'])
-        comment += "Stats for %s to play\n" % (color)
+        comment += "Overall win%%: %.2f%%\n" % (stats['winrate'] * 100)
+        comment += "Best move: %s\n" % ( abet[0] )
         comment += "====================\n"
-    #    comment += "MC Winrate:   %.4f\n" % (stats['mc_winrate'])
-    #    comment += "Value Net:    %.4f\n" % (stats['nn_winrate'])
-    #    comment += "Game Result:  %s\n" % (stats['margin'])
+        comment += "Visited %d nodes\n" % (stats['visits'])
+        comment += "====================\n"
 
-        sorted_moves = sorted(move_list.keys(), key=lambda k: move_list[k]['visits'], reverse=True)
-        comment += "Best winrate: %.4f\n" % (stats['winrate'])
-        comment += "Best move:    %s\n" % ( abet[sorted_moves.index(stats['best'])] )
-
-        for L, mv in zip(abet, sorted_moves):
-            vtext = "Visits: %d" % (move_list[mv]['visits'])
-            comment += "%s -> %20s  WinRate: %.4f\n" % (L, vtext, move_list[mv]['W'])
+        for L, mv in zip(abet, move_list):
+            comment += "%s -> Win%%: %.2f%% (%d visits) \n" % (L, mv['winrate'] * 100, mv['visits'])
 
     if cnode.has_key('C'):
         cnode['C'].data[0] = comment
     else:
         cnode.addProperty( cnode.makeProperty( 'C', [comment] ) )
 
-    LB_values = ["%s:%s" % (mv,L) for L, mv in zip(abet, sorted_moves)]
+    LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list)]
     if len(LB_values) > 0:
         cnode.addProperty( cnode.makeProperty( 'LB', LB_values ) )

@@ -23,10 +23,8 @@ def check_stream(fd):
     return ""
 
 class CLI(object):
-    def __init__(self, board_size=19, eval_limit=None, executable='leela_090_macOS_opencl',
-                 verbosity=0):
+    def __init__(self, board_size, executable,verbosity):
         self.history=[]
-        self.eval_limit=eval_limit
         self.executable = executable
         self.verbosity = verbosity
         self.board_size = board_size
@@ -87,8 +85,9 @@ class CLI(object):
 
     def start(self):
         xargs = []
-        if self.eval_limit is not None:
-            xargs = ['--playouts', str(self.eval_limit)]
+
+        if self.verbosity > 0:
+            print >>sys.stderr, "Starting leela..."
 
         p = Popen([self.executable, '--gtp', '--noponder'] + xargs, stdout=PIPE, stdin=PIPE, stderr=PIPE)
         set_non_blocking(p.stdout)
@@ -102,6 +101,9 @@ class CLI(object):
         check_stream(p.stdout)
 
     def stop(self):
+        if self.verbosity > 0:
+            print >>sys.stderr, "Stopping leela..."
+
         p = self.p
         p.stdin.write('exit\n')
         try: 
@@ -222,16 +224,16 @@ class CLI(object):
         status_regex = r'MC winrate=([0-9]+\.[0-9]+), NN eval=([0-9]+\.[0-9]+), score=([BW]\+[0-9]+\.[0-9]+)'
         move_regex = r'^([A-Z][0-9]+) -> +([0-9]+) \(W: +(\-?[0-9]+\.[0-9]+)\%\) \(U: +(\-?[0-9]+\.[0-9]+)\%\) \(V: +([0-9]+\.[0-9]+)\%: +([0-9]+)\) \(N: +([0-9]+\.[0-9]+)\%\) PV: (.*)$'
         best_regex = r'([0-9]+) visits, score (\-?[0-9]+\.[0-9]+)\% \(from \-?[0-9]+\.[0-9]+\%\) PV: (.*)'
-        summary_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
+        stats_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
         bookmove_regex = r'([0-9]+) book moves, ([0-9]+) total positions'
 
-        summary = {}
-        move_list = {}
+        stats = {}
+        move_list = []
 
         finished_regex = r'= ([A-Z][0-9]+)'
         M = re.search(finished_regex, stdout)
         if M is not None:
-            summary['chosen'] = self.parse_position(M.group(1))
+            stats['chosen'] = self.parse_position(M.group(1))
 
         finished=False
         summarized=False
@@ -242,19 +244,19 @@ class CLI(object):
 
             M = re.match(bookmove_regex, line)
             if M is not None:
-                summary['bookmoves'] = int(M.group(1))
-                summary['positions'] = int(M.group(2))
+                stats['bookmoves'] = int(M.group(1))
+                stats['positions'] = int(M.group(2))
 
             if not finished:
                 M = re.match(status_regex, line)
                 if M is not None:
-                    summary['mc_winrate'] = float(M.group(1))
-                    summary['nn_winrate'] = float(M.group(2))
-                    summary['margin'] = M.group(3)
+                    stats['mc_winrate'] = float(M.group(1))
+                    stats['nn_winrate'] = float(M.group(2))
+                    stats['margin'] = M.group(3)
 
                 M = re.match(move_regex, line)
                 if M is not None:
-                    start = self.parse_position(M.group(1))
+                    pos = self.parse_position(M.group(1))
                     visits = int(M.group(2))
                     W = self.to_fraction(M.group(3))
                     U = self.to_fraction(M.group(4))
@@ -264,27 +266,35 @@ class CLI(object):
                     seq = M.group(8)
                     seq = [self.parse_position(p) for p in seq.split()]
 
-                    move_list[start] = {'visits': visits,
-                                        'W': W, 'U': U, 'Vp': Vp, 'Vn': Vn,
-                                        'N': N, 'seq': seq}
+                    info = {
+                        'pos': pos,
+                        'visits': visits,
+                        'winrate': W, 'mc_winrate': U, 'nn_winrate': Vp, 'nn_count': Vn,
+                        'policy_prob': N, 'pv': seq
+                    }
+                    move_list.append(info)
+                    
             elif not summarized:
                 M = re.match(best_regex, line)
                 if M is not None:
-                    summary['best'] = self.parse_position(M.group(3).split()[0])
-                    summary['winrate'] = self.to_fraction(M.group(2))
+                    stats['best'] = self.parse_position(M.group(3).split()[0])
+                    stats['winrate'] = self.to_fraction(M.group(2))
 
-                M = re.match(summary_regex, line)
+                M = re.match(stats_regex, line)
                 if M is not None:
-                    summary['visits'] = int(M.group(1))
+                    stats['visits'] = int(M.group(1))
                     summarized=True
 
-        if 'bookmoves' in summary and len(move_list)==0:
-            move_list[summary['chosen']] = {'visits': 0, 'W': 0}
+        if 'bookmoves' in stats and len(move_list)==0:
+            move_list.append({'pos': stats['chosen']})
         else:
             required_keys = ['mc_winrate', 'nn_winrate', 'margin', 'best',
                              'winrate', 'visits']
             for k in required_keys:
-                if k not in summary:
-                    print >>sys.stderr, "WARNING: analysis summary missing data %s" % (k)
-
-        return summary, move_list
+                if k not in stats:
+                    print >>sys.stderr, "WARNING: analysis stats missing data %s" % (k)
+                    
+            move_list = [info for (i,info) in enumerate(move_list) if i != 0 and info['visits'] > 0]
+            move_list_moves = sorted(move_list, key = (lambda info: 1000000000000000 if info['pos'] == stats['best'] else info['visits']), reverse=True)
+                    
+        return stats, move_list
