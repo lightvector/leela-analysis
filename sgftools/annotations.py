@@ -26,7 +26,7 @@ def format_variation(cursor, seq):
     mv_data = [('black' if color == 'white' else 'white', stats, mv_list) for color, _mv, stats, mv_list in seq]
     insert_sequence(cursor, mv_seq, mv_data, format_analysis)
 
-def format_analysis(cursor, color, stats, move_list):
+def format_analysis(cursor, color, stats, move_list, delta):
     cnode = cursor.node
     abet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
@@ -35,13 +35,26 @@ def format_analysis(cursor, color, stats, move_list):
         comment += "Book move: %s\n" % (abet[0])
         comment += "====================\n"
         comment += "Considered %d/%d bookmoves\n" % (stats['bookmoves'], stats['positions'])
-        comment += "====================\n"
     else:
-        comment += "Overall win%%: %.2f%%\n" % (stats['winrate'] * 100)
+        delta = delta if color == "black" else (-delta)
+        if(delta < -0.02):
+            comment += "INACCURACY (delta %.2f%%)\n" % (delta * 100)
+            comment += "\n"
+        elif(delta < -0.04):
+            comment += "MISTAKE! (delta %.2f%%)\n" % (delta * 100)
+            comment += "\n"
+        elif(delta < -0.08):
+            comment += "BLUNDER!! (delta %.2f%%)\n" % (delta * 100)
+            comment += "\n"
+        else:
+            comment += "\n"
+            comment += "\n"
+
+        comment += "Overall black win%%: %.2f%%\n" % (stats['winrate'] * 100)
         comment += "Best move: %s\n" % ( abet[0] )
         comment += "====================\n"
         comment += "Visited %d nodes\n" % (stats['visits'])
-        comment += "====================\n"
+        comment += "\n"
 
         for L, mv in zip(abet, move_list):
             comment += "%s -> Win%%: %.2f%% (%d visits) \n" % (L, mv['winrate'] * 100, mv['visits'])

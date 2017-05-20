@@ -106,7 +106,7 @@ class CLI(object):
 
         p = self.p
         p.stdin.write('exit\n')
-        try: 
+        try:
             p.terminate()
         except OSError:
             pass
@@ -235,6 +235,10 @@ class CLI(object):
         if M is not None:
             stats['chosen'] = self.parse_position(M.group(1))
 
+        flip_winrate = self.whoseturn() == "white"
+        def maybe_flip(winrate):
+            return ((1.0 - winrate) if flip_winrate else winrate)
+
         finished=False
         summarized=False
         for line in stderr.split('\n'):
@@ -250,17 +254,17 @@ class CLI(object):
             if not finished:
                 M = re.match(status_regex, line)
                 if M is not None:
-                    stats['mc_winrate'] = float(M.group(1))
-                    stats['nn_winrate'] = float(M.group(2))
+                    stats['mc_winrate'] = maybe_flip(float(M.group(1)))
+                    stats['nn_winrate'] = maybe_flip(float(M.group(2)))
                     stats['margin'] = M.group(3)
 
                 M = re.match(move_regex, line)
                 if M is not None:
                     pos = self.parse_position(M.group(1))
                     visits = int(M.group(2))
-                    W = self.to_fraction(M.group(3))
-                    U = self.to_fraction(M.group(4))
-                    Vp = self.to_fraction(M.group(5))
+                    W = maybe_flip(self.to_fraction(M.group(3)))
+                    U = maybe_flip(self.to_fraction(M.group(4)))
+                    Vp = maybe_flip(self.to_fraction(M.group(5)))
                     Vn = int(M.group(6))
                     N = self.to_fraction(M.group(7))
                     seq = M.group(8)
@@ -273,12 +277,12 @@ class CLI(object):
                         'policy_prob': N, 'pv': seq
                     }
                     move_list.append(info)
-                    
+
             elif not summarized:
                 M = re.match(best_regex, line)
                 if M is not None:
                     stats['best'] = self.parse_position(M.group(3).split()[0])
-                    stats['winrate'] = self.to_fraction(M.group(2))
+                    stats['winrate'] = maybe_flip(self.to_fraction(M.group(2)))
 
                 M = re.match(stats_regex, line)
                 if M is not None:
@@ -288,13 +292,12 @@ class CLI(object):
         if 'bookmoves' in stats and len(move_list)==0:
             move_list.append({'pos': stats['chosen']})
         else:
-            required_keys = ['mc_winrate', 'nn_winrate', 'margin', 'best',
-                             'winrate', 'visits']
+            required_keys = ['mc_winrate', 'nn_winrate', 'margin', 'best', 'winrate', 'visits']
             for k in required_keys:
                 if k not in stats:
                     print >>sys.stderr, "WARNING: analysis stats missing data %s" % (k)
-                    
+
             move_list = [info for (i,info) in enumerate(move_list) if i != 0 and info['visits'] > 0]
             move_list_moves = sorted(move_list, key = (lambda info: 1000000000000000 if info['pos'] == stats['best'] else info['visits']), reverse=True)
-                    
+
         return stats, move_list
