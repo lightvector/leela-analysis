@@ -130,8 +130,6 @@ if __name__=='__main__':
     parser.add_option('-n', '--first-n', dest='analyze_first_n_moves', default=0, type=int,
                       help="Suggest moves for all of the first N moves (default=0)", metavar="N")
 
-    parser.add_option('-p', '--player', dest='player_color', 
-                      help="Set the player color to focus on during analysis")
     parser.add_option('-g', '--win-graph', dest='win_graph',
                       help="Graph the win rate of the selected player (Requires a move range with -m and -n)")
 
@@ -155,11 +153,6 @@ if __name__=='__main__':
     if not os.path.exists(sgf_fn):
         parser.error("No such file: %s" % (sgf_fn))
     sgf = gotools.import_sgf(sgf_fn)
-
-    if options.player_color not in ['black', 'white']:
-        parser.error("Player color must be one of black or white")
-    if options.win_graph and not options.player_color:
-        parser.error("Win graph option -g requires specifying the player of interest with -p")
 
     RESTART_COUNT = options.restarts
 
@@ -264,7 +257,7 @@ if __name__=='__main__':
             traceback.print_exc()
 
     if options.win_graph:
-        graph_winrates(collected_winrates, options.player_color, options.win_graph)
+        graph_winrates(collected_winrates, "black", options.win_graph)
 
     pb.finish()
     print sgf
