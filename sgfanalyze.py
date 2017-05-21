@@ -90,7 +90,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
 
         for (i,move) in enumerate(move_list):
             #Don't expand on the actual game line as a variation!
-            if node["is_root"] and move == game_move:
+            if node["is_root"] and move["pos"] == game_move:
                 node["children"].append(None)
                 continue
             subhistory = node["history"][:]
@@ -146,7 +146,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
             # Only display info for the principal variation or for lines that have been explored.
             for i in range(len(node["children"])):
                 child = node["children"][i]
-                if i == 0 or (child is not None and child["explored"]):
+                if child is not None and (i == 0 or child["explored"]):
                     move_list_to_display.append(node["move_list"][i])
             (analysis_comment, lb_values, tr_values) = annotations.format_analysis(node["stats"],move_list_to_display,None)
             annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)

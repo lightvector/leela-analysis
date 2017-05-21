@@ -29,7 +29,7 @@ def format_variation(cursor, seq):
 def format_pos(pos,board_size):
     if len(pos) != 2:
         return pos
-    return (pos[0] + str(board_size - (ord(pos[1]) - ord('a')))).upper()
+    return "ABCDEFGHJKLMNOPQRSTUVXYZ"[ord(pos[0]) - ord('a')] + str(board_size - (ord(pos[1]) - ord('a')))
 
 def format_winrate(stats,move_list,board_size):
     comment = ""
