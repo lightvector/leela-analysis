@@ -67,7 +67,7 @@ def format_delta_info(delta, stats, this_move):
     comment += "\n"
     return (comment,LB_values)
 
-def format_analysis(stats, move_list):
+def format_analysis(stats, move_list, this_move):
     abet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     comment = ""
     if 'bookmoves' in stats:
@@ -82,9 +82,11 @@ def format_analysis(stats, move_list):
             comment += "%s -> Win%%: %.2f%% (%d visits) \n" % (L, mv['winrate'] * 100, mv['visits'])
 
     LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list)]
-    return (comment,LB_values)
+    mvs = [mv['pos'] for mv in move_list]
+    TR_values = [this_move] if this_move not in mvs and this_move is not None else []
+    return (comment,LB_values,TR_values)
 
-def annotate_sgf(cursor, comment, LB_values):
+def annotate_sgf(cursor, comment, LB_values, TR_values):
     cnode = cursor.node
     if cnode.has_key('C'):
         cnode['C'].data[0] += comment
@@ -93,3 +95,5 @@ def annotate_sgf(cursor, comment, LB_values):
 
     if len(LB_values) > 0:
         cnode.addProperty( cnode.makeProperty( 'LB', LB_values ) )
+    if len(TR_values) > 0:
+        cnode.addProperty( cnode.makeProperty( 'TR', TR_values ) )

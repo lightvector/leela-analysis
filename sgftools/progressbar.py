@@ -54,6 +54,10 @@ class ProgressBar(object):
         time_elapsed = "%d:%02d:%02d" % ( H, M, S )
         return time_elapsed
 
+    def update_max(self, value):
+        self.max_value = value
+        self.update(self.value)
+
     def update(self, value):
         self.value = value
 
