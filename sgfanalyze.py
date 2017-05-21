@@ -4,7 +4,7 @@ import optparse
 import hashlib
 import pickle
 import traceback
-from sgftools import gotools, leela, annotations, progressbar
+from sgftools import gotools, leela, annotations, progressbar, sgflib
 
 RESTART_COUNT=1
 
@@ -45,15 +45,29 @@ def retry_analysis(fn):
     return wrapped
 
 @retry_analysis
-def do_analyze(leela):
-    leela.reset()
-    leela.goto_position()
-    stats, move_list = leela.analyze()
+def do_analyze(leela, verbosity):
+    ckpt_hash = 'analyze_' + leela.history_hash()
+    ckpt_fn = os.path.join(base_dir, ckpt_hash)
+    if verbosity > 2:
+        print >>sys.stderr, "Looking for checkpoint file:", ckpt_fn
+
+    if os.path.exists(ckpt_fn):
+        if verbosity > 1:
+            print >>sys.stderr, "Loading checkpoint file:", ckpt_fn
+        with open(ckpt_fn, 'r') as ckpt_file:
+            stats, move_list = pickle.load(ckpt_file)
+    else:
+        leela.reset()
+        leela.goto_position()
+        stats, move_list = leela.analyze()
+        with open(ckpt_fn, 'w') as ckpt_file:
+            pickle.dump((stats, move_list), ckpt_file)
+
     return stats, move_list
 
 # move_list is from a call to do_analyze
 # Iteratively expands a tree of moves by expanding on the leaf with the highest "probability of reaching".
-def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, game_move):
+def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, game_move, verbosity):
     if 'bookmoves' in stats or len(move_list) <= 0:
         return
 
@@ -61,9 +75,10 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
     leaves = []
     tree = { "children": [], "is_root": True, "history": [], "explored": False, "prob": 1.0, "stats": stats, "move_list": move_list, "color": rootcolor }
 
-    def expand(node, color, stats, move_list):
+    def expand(node, stats, move_list):
+        assert node["color"] in ['white', 'black']
         def child_prob_raw(i,move):
-            if color == rootcolor:
+            if node["color"] == rootcolor:
                 return move["visits"] ** 1.0
             else:
                 return (move["policy_prob"] + 2.0 * (move["visits"] ** 0.5)) / 3.0
@@ -81,8 +96,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
             subhistory = node["history"][:]
             subhistory.append(move["pos"])
             prob = node["prob"] * child_prob(i,move)
-            assert color in ['white', 'black']
-            clr = "white" if color == "black" else "white"
+            clr = "white" if node["color"] == "black" else "black"
             child = { "children": [], "is_root": False, "history": subhistory, "explored": False, "prob": prob, "stats": {}, "move_list": [], "color": clr }
             node["children"].append(child)
             leaves.append(child)
@@ -91,20 +105,21 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
         node["move_list"] = move_list
         node["explored"] = True
 
-        leaves = [n for n in leaves if not (n is node)]
+        for i in range(len(leaves)):
+            if leaves[i] is node:
+                del leaves[i]
+                break
 
     def search(node):
         for mv in node["history"]:
             leela.add_move(leela.whoseturn(),mv)
-        stats, move_list = do_analyze(leela)
-        nodecolor = leela.whoseturn()
-        expand(node,nodecolor,stats,move_list)
+        stats, move_list = do_analyze(leela,verbosity)
+        expand(node,stats,move_list)
 
         for mv in node["history"]:
-            color = leela.whoseturn()
             leela.pop_move()
 
-    expand(tree)
+    expand(tree,stats,move_list)
     for i in range(nodes_per_variation):
         if len(leaves) > 0:
             node = max(leaves,key=(lambda n: n["prob"]))
@@ -112,15 +127,15 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
 
     def advance(C, color, mv):
         foundChildIdx = None
-        color = 'W' if color =='white' else 'B'
+        clr = 'W' if color =='white' else 'B'
         for j in range(len(C.children)):
-            if color in C.children[j].node.keys and C.children[j].node[color].data[0] == mv:
+            if clr in C.children[j].keys() and C.children[j][clr].data[0] == mv:
                 foundChildIdx = j
         if foundChildIdx is not None:
             C.next(foundChildIdx)
         else:
             nnode = sgflib.Node()
-            nnode.addProperty(nnode.makeProperty(color,[mv]))
+            nnode.addProperty(nnode.makeProperty(clr,[mv]))
             C.appendNode(nnode)
             C.next(len(C.children)-1)
 
@@ -140,10 +155,12 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
                 else:
                     pv = node["move_list"][i]["pv"]
                     c = node["color"]
-                    for k in range(min(len(pv),6)):
-                        c = 'black' if c =='white' else 'white'
+                    #TODO only show variations for the more likely lines?
+                    num_to_show = min(len(pv), max(1, len(pv) * 2 / 3 - 1))
+                    for k in range(num_to_show):
                         advance(C, c, pv[k])
-                    for k in range(min(len(pv),6)):
+                        c = 'black' if c =='white' else 'white'
+                    for k in range(num_to_show):
                         C.previous()
 
     record(tree)
@@ -313,20 +330,7 @@ if __name__=='__main__':
             if ((move_num >= options.analyze_start and move_num <= options.analyze_end) or
                 (move_num in comment_requests_analyze) or
                 (move_num in comment_requests_variations)):
-                ckpt_hash = 'analyze_' + leela.history_hash()
-                ckpt_fn = os.path.join(base_dir, ckpt_hash)
-                if options.verbosity > 2:
-                    print >>sys.stderr, "Looking for checkpoint file:", ckpt_fn
-                if os.path.exists(ckpt_fn):
-                    if options.verbosity > 1:
-                        print >>sys.stderr, "Loading checkpoint file:", ckpt_fn
-                    with open(ckpt_fn, 'r') as ckpt_file:
-                        stats, move_list = pickle.load(ckpt_file)
-                else:
-                    stats, move_list = do_analyze(leela)
-
-                with open(ckpt_fn, 'w') as ckpt_file:
-                    pickle.dump((stats, move_list), ckpt_file)
+                stats, move_list = do_analyze(leela,options.verbosity)
 
                 if 'winrate' in stats and stats['visits'] > 100:
                     collected_winrates[move_num] = (current_player, stats['winrate'])
@@ -345,14 +349,14 @@ if __name__=='__main__':
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
                 if delta <= -options.delta_sensitivity2 or move_num in comment_requests_variations:
-                   needs_variations[move_num-1] = (stats,move_list)
+                   needs_variations[move_num-1] = (prev_stats,prev_move_list)
                    if move_num not in comment_requests_variations:
                        variations_tasks += 1
 
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
 
                 if (move_num-1) in comment_requests_analyze or delta <= -options.delta_sensitivity:
-                    (analysis_comment, lb_values, tr_values) = annotations.format_analysis(stats, move_list, this_move)
+                    (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
                     C.previous()
                     annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
                     C.next()
@@ -364,6 +368,7 @@ if __name__=='__main__':
                 refresh_pb()
 
         leela.stop()
+        leela.clear_history()
 
         # Now fill in variations for everything we need
         move_num = -1
@@ -391,7 +396,7 @@ if __name__=='__main__':
                     next_game_move = C.node['B'].data[0]
                 C.previous()
 
-            do_variations(C, leela, stats, move_list, options.nodes_per_variation, board_size, next_game_move)
+            do_variations(C, leela, stats, move_list, options.nodes_per_variation, board_size, next_game_move, options.verbosity)
             variations_tasks_done += 1
 
             # if analysis_mode=='variations':
@@ -419,8 +424,8 @@ if __name__=='__main__':
             #         pickle.dump((stats, move_list, sequences), ckpt_file)
 
     except:
-        print >>sys.stderr, "Failure in leela, reporting partial results...\n"
         traceback.print_exc()
+        print >>sys.stderr, "Failure, reporting partial results...\n"
     finally:
         leela.stop()
 
