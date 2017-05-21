@@ -304,7 +304,7 @@ class CLI(object):
                 if k not in stats:
                     print >>sys.stderr, "WARNING: analysis stats missing data %s" % (k)
 
-            move_list = [info for (i,info) in enumerate(move_list) if i != 0 and info['visits'] > 0]
-            move_list_moves = sorted(move_list, key = (lambda info: 1000000000000000 if info['pos'] == stats['best'] else info['visits']), reverse=True)
+            move_list = sorted(move_list, key = (lambda info: 1000000000000000 if info['pos'] == stats['best'] else info['visits']), reverse=True)
+            move_list = [info for (i,info) in enumerate(move_list) if i == 0 or info['visits'] > 0]
 
         return stats, move_list

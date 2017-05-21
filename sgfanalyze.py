@@ -81,7 +81,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
             if node["color"] == rootcolor:
                 return move["visits"] ** 1.0
             else:
-                return (move["policy_prob"] + 2.0 * (move["visits"] ** 0.5)) / 3.0
+                return (move["policy_prob"] + move["visits"]) / 2.0
         probsum = 0.0
         for (i,move) in enumerate(move_list):
             probsum += child_prob_raw(i,move)
@@ -142,7 +142,13 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
     def record(node):
         if not node["is_root"]:
             annotations.annotate_sgf(C, annotations.format_winrate(node["stats"],node["move_list"],board_size), [], [])
-            (analysis_comment, lb_values, tr_values) = annotations.format_analysis(node["stats"],node["move_list"],None)
+            move_list_to_display = []
+            # Only display info for the principal variation or for lines that have been explored.
+            for i in range(len(node["children"])):
+                child = node["children"][i]
+                if i == 0 or (child is not None and child["explored"]):
+                    move_list_to_display.append(node["move_list"][i])
+            (analysis_comment, lb_values, tr_values) = annotations.format_analysis(node["stats"],move_list_to_display,None)
             annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
 
         for i in range(len(node["children"])):
@@ -152,10 +158,10 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
                     advance(C, node["color"], child["history"][-1])
                     record(child)
                     C.previous()
-                else:
+                # Only show variations for the principal line, to prevent info overload
+                elif i == 0:
                     pv = node["move_list"][i]["pv"]
                     c = node["color"]
-                    #TODO only show variations for the more likely lines?
                     num_to_show = min(len(pv), max(1, len(pv) * 2 / 3 - 1))
                     for k in range(num_to_show):
                         advance(C, c, pv[k])
@@ -398,30 +404,6 @@ if __name__=='__main__':
 
             do_variations(C, leela, stats, move_list, options.nodes_per_variation, board_size, next_game_move, options.verbosity)
             variations_tasks_done += 1
-
-            # if analysis_mode=='variations':
-            #     ckpt_hash = ('analyze_%d_%d_' + leela.history_hash()) % (options.num_branches, options.depth)
-            #     ckpt_fn = os.path.join(base_dir, ckpt_hash)
-            #     if options.verbosity > 2:
-            #         print >>sys.stderr, "Looking for checkpoint file:", ckpt_fn
-            #     if os.path.exists(ckpt_fn):
-            #         if options.verbosity > 1:
-            #             print >>sys.stderr, "Loading checkpoint file:", ckpt_fn
-            #         with open(ckpt_fn, 'r') as ckpt_file:
-            #             stats, move_list, sequences = pickle.load(ckpt_file)
-            #         pb.increment( 1+sum(len(seq) for seq in sequences) )
-            #     else:
-            #         stats, move_list, sequences = do_analyze(C, leela, pb)
-
-            #     if 'winrate' in stats and stats['visits'] > 1000:
-            #         collected_winrates[move_num] = (current_player, stats['winrate'])
-
-            #     annotations.format_analysis(C, leela.whoseturn(), stats, move_list)
-            #     for seq in sequences:
-            #         annotations.format_variation(C, seq)
-
-            #     with open(ckpt_fn, 'w') as ckpt_file:
-            #         pickle.dump((stats, move_list, sequences), ckpt_file)
 
     except:
         traceback.print_exc()
