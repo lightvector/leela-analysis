@@ -14,8 +14,7 @@ Added features and modifications from the original scripts:
 
 ### How to Use
 First, download and install the "engine only"/"commandline"/"GTP" version of Leela 0.10.0 from:
-
-    https://sjeng.org/leela.html
+https://sjeng.org/leela.html
 
 Clone this repository to a local directory:
 
