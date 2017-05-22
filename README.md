@@ -1,6 +1,8 @@
-==Leela Analysis Script==
+## Leela Analysis Script
 
-This script is a modified version of scripts originally from https://bitbucket.org/mkmatlock/sgftools
+This script is a modified version of scripts originally from:
+https://bitbucket.org/mkmatlock/sgftools
+
 Currently, it's designed to work with Leela 0.10.0, no guarantees about compatibility with any past or future versions.
 
 Added features and modifications from the original scripts:
@@ -10,7 +12,7 @@ Added features and modifications from the original scripts:
      in very close endgames or with certain kinds of sekis the analysis may not be correct).
    * A variety of minor tweaks to the script interface and the information output to the SGF.
 
-=How to Use=
+### How to Use
 First, download and install the "engine only"/"commandline"/"GTP" version of Leela 0.10.0 from:
 
     https://sjeng.org/leela.html
