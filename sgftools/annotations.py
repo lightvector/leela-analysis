@@ -35,6 +35,8 @@ def format_winrate(stats,move_list,board_size):
     comment = ""
     if'winrate' in stats:
         comment += "Overall black win%%: %.2f%%\n" % (stats['winrate'] * 100)
+    else
+        comment += "Overall black win%%: not computed (Leela still in opening book)"
 
     if len(move_list) > 0:
         comment += "Leela's next move: %s\n" % format_pos(move_list[0]['pos'],board_size)

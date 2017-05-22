@@ -1,6 +1,6 @@
 #!/usr/bin/python
 import os, sys
-import optparse
+import argparse
 import hashlib
 import pickle
 import traceback
@@ -46,7 +46,7 @@ def retry_analysis(fn):
 
 @retry_analysis
 def do_analyze(leela, verbosity):
-    ckpt_hash = 'analyze_' + leela.history_hash()
+    ckpt_hash = 'analyze_' + leela.history_hash() + "_" + str(leela.seconds_per_search) + "sec"
     ckpt_fn = os.path.join(base_dir, ckpt_hash)
     if verbosity > 2:
         print >>sys.stderr, "Looking for checkpoint file:", ckpt_fn
@@ -181,7 +181,7 @@ def calculate_tasks_left(sgf, start_m, end_n):
         C.next()
 
         analysis_mode = None
-        if move_num >= options.analyze_start and move_num <= options.analyze_end:
+        if move_num >= args.analyze_start and move_num <= args.analyze_end:
             analysis_mode='analyze'
 
         if 'C' in C.node.keys():
@@ -200,50 +200,50 @@ def calculate_tasks_left(sgf, start_m, end_n):
     return (analyze_tasks,variations_tasks)
 
 if __name__=='__main__':
-    parser = optparse.OptionParser()
-    parser.add_option('-m', '--starting-at-m', dest='analyze_start', default=0, type=int,
-                      help="Analyze game starting at move M (default=0)", metavar="M")
-    parser.add_option('-n', '--ending-at-n', dest='analyze_end', default=1000, type=int,
-                      help="Analyze game ending at move N (default=1000)", metavar="N")
+    parser = argparse.ArgumentParser()
+    required = parser.add_argument_group('required named arguments')
+    parser.add_argument('--start', dest='analyze_start', default=0, type=int, metavar="MOVENUM",
+                        help="Analyze game starting at this move (default=0)")
+    parser.add_argument('--stop', dest='analyze_end', default=1000, type=int, metavar="MOVENUM",
+                        help="Analyze game stopping at this move (default=1000)")
 
-    parser.add_option('', '--analyze-threshold', dest='delta_sensitivity', default=0.02, type=float,
-                      help="Display analysis on moves losing at least this much win rate (default=0.02)")
-    parser.add_option('', '--variations-threshold', dest='delta_sensitivity2', default=0.05, type=float,
-                      help="Explore variations on moves losing at least this much win rate (default=0.05)")
+    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.02, type=float, metavar="T",
+                        help="Display analysis on moves losing at least this much win rate (default=0.02)")
+    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.02, type=float, metavar="T",
+                        help="Explore variations on moves losing at least this much win rate (default=0.02)")
 
-    parser.add_option('', '--seconds-per-search', dest='seconds_per_search', default=10, type=float,
-                      help="How many seconds to use per search (default=10)")
-    parser.add_option('', '--nodes-per-variation', dest='nodes_per_variation', default=6, type=int,
-                      help="How many searches to use exploring each variation tree (default=6)")
+    parser.add_argument('--secs-per-search', dest='seconds_per_search', default=10, type=float, metavar="S",
+                        help="How many seconds to use per search (default=10)")
+    parser.add_argument('--nodes-per-var', dest='nodes_per_variation', default=8, type=int, metavar="N",
+                        help="How many nodes to explore with leela in each variation tree (default=8)")
+    parser.add_argument('--win-graph', dest='win_graph', metavar="PDF",
+                        help="Output pdf graph of win rate to this file, must have matplotlib installed")
+    parser.add_argument('-v','--verbosity', default=0, type=int, metavar="V",
+                        help="Set the verbosity level, 0: progress only, 1: progress+status, 2: progress+status+state")
+    required.add_argument('--leela', dest='executable', required=True, metavar="CMD",
+                        help="Path or command to run Leela executable")
+    parser.add_argument('--cache', dest='ckpt_dir', metavar="DIR",
+                        default=os.path.expanduser('~/.leela_checkpoints'),
+                        help="Set a directory to cache partially complete analyses, default ~/.leela_checkpoints")
+    parser.add_argument('--restarts', default=2, type=int, metavar="N",
+                        help="If leela crashes, retry the analysis step this many times before reporting a failure")
+    parser.add_argument("SGF_FILE", help="SGF file to analyze")
 
-    parser.add_option('-g', '--win-graph', dest='win_graph',
-                      help="Graph the win rate of the selected player (Requires a move range with -m and -n)")
-
-    parser.add_option('-v', '--verbosity', default=0, type=int,
-                      help="Set the verbosity level, 0: progress only, 1: progress+status, 2: progress+status+state")
-    parser.add_option('-x', '--executable', default='leela_090_macOS_opencl',
-                      help="Set the default executable name for the leela command line engine")
-    parser.add_option('-c', '--checkpoint-directory', dest='ckpt_dir',
-                      default=os.path.expanduser('~/.leela_checkpoints'),
-                      help="Set a directory to store partially complete analyses")
-    parser.add_option('-r', '--restarts', default=2, type=int,
-                      help="If leela crashes, retry the analysis step this many times before reporting a failure")
-
-    options, args = parser.parse_args()
-    sgf_fn = args[0]
+    args = parser.parse_args()
+    sgf_fn = args.SGF_FILE
     if not os.path.exists(sgf_fn):
         parser.error("No such file: %s" % (sgf_fn))
     sgf = gotools.import_sgf(sgf_fn)
 
-    RESTART_COUNT = options.restarts
+    RESTART_COUNT = args.restarts
 
-    if not os.path.exists( options.ckpt_dir ):
-        os.mkdir( options.ckpt_dir )
+    if not os.path.exists( args.ckpt_dir ):
+        os.mkdir( args.ckpt_dir )
     base_hash = hashlib.md5( os.path.abspath(sgf_fn) ).hexdigest()
-    base_dir = os.path.join(options.ckpt_dir, base_hash)
+    base_dir = os.path.join(args.ckpt_dir, base_hash)
     if not os.path.exists( base_dir ):
         os.mkdir( base_dir )
-    if options.verbosity > 1:
+    if args.verbosity > 1:
         print >>sys.stderr, "Checkpoint dir:", base_dir
 
     comment_requests_analyze = {}
@@ -277,22 +277,22 @@ if __name__=='__main__':
         if cnode.has_key('C'):
             cnode['C'].data[0] = ""
 
-    (analyze_tasks_initial,variations_tasks_initial) = calculate_tasks_left(sgf, options.analyze_start, options.analyze_end)
-    variations_task_probability = 1.0 / (1.0 + options.delta_sensitivity2 * 50.0)
+    (analyze_tasks_initial,variations_tasks_initial) = calculate_tasks_left(sgf, args.analyze_start, args.analyze_end)
+    variations_task_probability = 1.0 / (1.0 + args.variations_threshold * 100.0)
     analyze_tasks_initial_done = 0
     variations_tasks = 0
     variations_tasks_done = 0
     def approx_tasks_done():
         return (
             analyze_tasks_initial_done +
-            (variations_tasks_done  * options.nodes_per_variation)
+            (variations_tasks_done  * args.nodes_per_variation)
         )
     def approx_tasks_max():
         return (
             (analyze_tasks_initial - analyze_tasks_initial_done) *
-            (1 + variations_task_probability * options.nodes_per_variation) +
+            (1 + variations_task_probability * args.nodes_per_variation) +
             analyze_tasks_initial_done +
-            (variations_tasks * options.nodes_per_variation)
+            (variations_tasks * args.nodes_per_variation)
         )
 
     print >>sys.stderr, "Executing approx %.0f analysis steps" % (approx_tasks_max())
@@ -304,9 +304,9 @@ if __name__=='__main__':
         pb.update(approx_tasks_done())
 
     leela = leela.CLI(board_size=board_size,
-                      executable=options.executable,
-                      seconds_per_search=options.seconds_per_search,
-                      verbosity=options.verbosity)
+                      executable=args.executable,
+                      seconds_per_search=args.seconds_per_search,
+                      verbosity=args.verbosity)
 
     collected_winrates = {}
     collected_best_moves = {}
@@ -333,10 +333,10 @@ if __name__=='__main__':
                 leela.add_move('black', this_move)
 
             current_player = leela.whoseturn()
-            if ((move_num >= options.analyze_start and move_num <= options.analyze_end) or
+            if ((move_num >= args.analyze_start and move_num <= args.analyze_end) or
                 (move_num in comment_requests_analyze) or
                 (move_num in comment_requests_variations)):
-                stats, move_list = do_analyze(leela,options.verbosity)
+                stats, move_list = do_analyze(leela,args.verbosity)
 
                 if 'winrate' in stats and stats['visits'] > 100:
                     collected_winrates[move_num] = (current_player, stats['winrate'])
@@ -350,18 +350,18 @@ if __name__=='__main__':
                        delta = stats['winrate'] - collected_best_move_winrates[move_num-1]
                        delta = min(0.0, (-delta if leela.whoseturn() == "black" else delta))
 
-                if delta <= -options.delta_sensitivity:
+                if delta <= -args.analyze_threshold:
                     (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,stats,this_move)
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
-                if delta <= -options.delta_sensitivity2 or move_num in comment_requests_variations:
+                if delta <= -args.variations_threshold or move_num in comment_requests_variations:
                    needs_variations[move_num-1] = (prev_stats,prev_move_list)
                    if move_num not in comment_requests_variations:
                        variations_tasks += 1
 
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
 
-                if (move_num-1) in comment_requests_analyze or delta <= -options.delta_sensitivity:
+                if (move_num-1) in comment_requests_analyze or delta <= -args.analyze_threshold:
                     (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
                     C.previous()
                     annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
@@ -402,7 +402,7 @@ if __name__=='__main__':
                     next_game_move = C.node['B'].data[0]
                 C.previous()
 
-            do_variations(C, leela, stats, move_list, options.nodes_per_variation, board_size, next_game_move, options.verbosity)
+            do_variations(C, leela, stats, move_list, args.nodes_per_variation, board_size, next_game_move, args.verbosity)
             variations_tasks_done += 1
 
     except:
@@ -411,8 +411,8 @@ if __name__=='__main__':
     finally:
         leela.stop()
 
-    if options.win_graph:
-        graph_winrates(collected_winrates, "black", options.win_graph)
+    if args.win_graph:
+        graph_winrates(collected_winrates, "black", args.win_graph)
 
     pb.finish()
     print sgf
