@@ -308,7 +308,7 @@ class CLI(object):
                     summarized=True
 
         if 'bookmoves' in stats and len(move_list)==0:
-            move_list.append({'pos': stats['chosen']})
+            move_list.append({'pos': stats['chosen'], 'is_book': True})
         else:
             required_keys = ['mc_winrate', 'nn_winrate', 'margin', 'best', 'winrate', 'visits']
             for k in required_keys:

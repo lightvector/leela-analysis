@@ -17,7 +17,7 @@ class ProgressBar(object):
     def start(self):
         self.start_time = datetime.datetime.now()
         self.stream.write( "\n" )
-        self.update(0)
+        self.update(0,self.max_value)
 
     def estimate_time(self, percent):
         if percent == 0:
@@ -54,12 +54,9 @@ class ProgressBar(object):
         time_elapsed = "%d:%02d:%02d" % ( H, M, S )
         return time_elapsed
 
-    def update_max(self, value):
-        self.max_value = value
-        self.update(self.value)
-
-    def update(self, value):
+    def update(self, value, max_value):
         self.value = value
+        self.max_value = max_value
 
         D = float(self.max_value - self.min_value)
         if D == 0:
@@ -75,7 +72,7 @@ class ProgressBar(object):
         time_remaining = self.estimate_time(percent)
 
         if self.update_cnt == 0:
-            self.stream.write( "|%s| %6s%% | %s | %s / %s\n" % (bar_str, "pctdone", "timeleft", "done", "total") )
+            self.stream.write( "|%s| %6s%% | %s | %s / %s\n" % (bar_str, "done", "Est...", "done", "total") )
 
         if self.update_cnt % self.frequency == 0:
             if self.message is None:
@@ -87,11 +84,8 @@ class ProgressBar(object):
     def set_message(self, message):
         self.message = message
 
-    def increment(self, step=1):
-        self.update( self.value + step )
-
     def finish(self):
-        self.update(self.max_value)
+        self.update(self.max_value, self.max_value)
         bar_str = "=" * self.width
         time_remaining = self.elapsed_time()
         self.stream.write( "\r|%s| 100.00%% | Done. | Elapsed Time: %s                                             \n" % (bar_str, time_remaining) )

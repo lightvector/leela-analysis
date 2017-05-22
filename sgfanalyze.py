@@ -97,7 +97,10 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
     def expand(node, stats, move_list):
         assert node["color"] in ['white', 'black']
         def child_prob_raw(i,move):
-            if node["color"] == rootcolor:
+            # possible for book moves
+            if "is_book" in move:
+                return 1.0
+            elif node["color"] == rootcolor:
                 return move["visits"] ** 1.0
             else:
                 return (move["policy_prob"] + move["visits"]) / 2.0
@@ -346,8 +349,7 @@ if __name__=='__main__':
     pb = progressbar.ProgressBar(max_value=approx_tasks_max())
     pb.start()
     def refresh_pb():
-        pb.update_max(approx_tasks_max())
-        pb.update(approx_tasks_done())
+        pb.update(approx_tasks_done(), approx_tasks_max())
 
     leela = leela.CLI(board_size=board_size,
                       executable=args.executable,
@@ -368,6 +370,7 @@ if __name__=='__main__':
         prev_move_list = []
 
         leela.start()
+        add_moves_to_leela(C,leela)
         while not C.atEnd:
             C.next()
             move_num += 1
@@ -421,6 +424,7 @@ if __name__=='__main__':
         move_num = -1
         C = sgf.cursor()
         leela.start()
+        add_moves_to_leela(C,leela)
         while not C.atEnd:
             C.next()
             move_num += 1
