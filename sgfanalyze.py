@@ -4,7 +4,11 @@ import argparse
 import hashlib
 import pickle
 import traceback
+import math
 from sgftools import gotools, leela, annotations, progressbar, sgflib
+
+# Stdev of bell curve whose cdf we take to be the "real" probability given Leela's winrate
+DEFAULT_STDEV = 0.20
 
 RESTART_COUNT=1
 
@@ -49,6 +53,78 @@ def add_moves_to_leela(C,leela):
         for move in C.node['AW'].data:
             leela.add_move('white', move)
     return this_move
+
+# Make a function that applies a transform to the winrate that stretches out the middle range and squashes the extreme ranges,
+# to make it a more linear function and suppress Leela's suggestions in won/lost games.
+# Currently, the CDF of the probability distribution from 0 to 1 given by x^k * (1-x)^k, where k is set to be the value such that
+# the stdev of the distribution is stdev.
+def winrate_transformer(stdev, verbosity):
+  def logfactorial(x):
+    return math.lgamma(x+1)
+  # Variance of the distribution =
+  # = The integral from 0 to 1 of (x-0.5)^2 x^k (1-x)^k dx
+  # = (via integration by parts)  (k+2)!k! / (2k+3)! - (k+1)!k! / (2k+2)! + (1/4) * k!^2 / (2k+1)!
+  #
+  # Normalize probability by dividing by the integral from 0 to 1 of x^k (1-x)^k dx :
+  # k!^2 / (2k+1)!
+  # And we get:
+  # (k+1)(k+2) / (2k+2) / (2k+3) - (k+1) / (2k+2) + (1/4)
+  def variance(k):
+    k = float(k)
+    return (k+1) * (k+2) / (2*k+2) / (2*k+3) - (k+1) / (2*k+2) + 0.25
+  # Perform binary search to find the appropriate k
+  def find_k(lower,upper):
+    while True:
+      mid = 0.5 * (lower + upper)
+      if mid == lower or mid == upper or lower >= upper:
+        return mid
+      var = variance(mid)
+      if var < stdev * stdev:
+        upper = mid
+      else:
+        lower = mid
+
+  if stdev * stdev <= 1e-10:
+    raise ValueError("Stdev too small, please choose a more reasonable value")
+
+  # Repeated doubling to find an upper bound big enough
+  upper = 1
+  while variance(upper) > stdev * stdev:
+    upper = upper * 2
+
+  k = find_k(0,upper)
+
+  if verbosity > 2:
+      print >>sys.stderr, "Using k=%f, stdev=%f" % (k,math.sqrt(variance(k)))
+
+  def unnormpdf(x):
+    if x <= 0 or x >= 1 or 1-x <= 0:
+      return 0
+    a = math.log(x)
+    b = math.log(1-x)
+    logprob = a * k + b * k
+    # Constant scaling so we don't overflow floats with crazy values
+    logprob = logprob - 2 * k * math.log(0.5)
+    return math.exp(logprob)
+
+  #Precompute a big array to approximate the CDF
+  n = 100000
+  lookup = [ unnormpdf(float(x)/float(n)) for x in range(n+1) ]
+  cum = 0
+  for i in range(n+1):
+    cum += lookup[i]
+    lookup[i] = cum
+  for i in range(n+1):
+    lookup[i] = lookup[i] / lookup[n]
+
+  def cdf(x):
+    i = int(math.floor(x * n))
+    if i == n:
+      return lookup[i]
+    excess = x * n - i
+    return lookup[i] + excess * (lookup[i+1] - lookup[i])
+
+  return (lambda x: cdf(x))
 
 
 def retry_analysis(fn):
@@ -229,10 +305,10 @@ if __name__=='__main__':
     parser.add_argument('--stop', dest='analyze_end', default=1000, type=int, metavar="MOVENUM",
                         help="Analyze game stopping at this move (default=1000)")
 
-    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.02, type=float, metavar="T",
-                        help="Display analysis on moves losing at least this much win rate (default=0.02)")
-    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.02, type=float, metavar="T",
-                        help="Explore variations on moves losing at least this much win rate (default=0.02)")
+    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.025, type=float, metavar="T",
+                        help="Display analysis on moves losing approx at least this much win rate when the game is close (default=0.02)")
+    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.025, type=float, metavar="T",
+                        help="Explore variations on moves losing approx at least this much win rate when the game is close (default=0.02)")
 
     parser.add_argument('--secs-per-search', dest='seconds_per_search', default=10, type=float, metavar="S",
                         help="How many seconds to use per search (default=10)")
@@ -344,6 +420,10 @@ if __name__=='__main__':
             (variations_tasks * args.nodes_per_variation)
         )
 
+    transform_winrate = winrate_transformer(DEFAULT_STDEV, args.verbosity)
+    analyze_threshold = transform_winrate(0.5 + 0.5 * args.analyze_threshold) - transform_winrate(0.5 - 0.5 * args.analyze_threshold)
+    variations_threshold = transform_winrate(0.5 + 0.5 * args.variations_threshold) - transform_winrate(0.5 - 0.5 * args.variations_threshold)
+
     print >>sys.stderr, "Executing approx %.0f analysis steps" % (approx_tasks_max())
 
     pb = progressbar.ProgressBar(max_value=approx_tasks_max())
@@ -389,23 +469,26 @@ if __name__=='__main__':
                     collected_best_move_winrates[move_num] = move_list[0]['winrate']
 
                 delta = 0.0
+                transdelta = 0.0
                 if (move_num-1) in collected_best_moves:
                     if(this_move != collected_best_moves[move_num-1]):
                        delta = stats['winrate'] - collected_best_move_winrates[move_num-1]
                        delta = min(0.0, (-delta if leela.whoseturn() == "black" else delta))
+                       transdelta = transform_winrate(stats['winrate']) - transform_winrate(collected_best_move_winrates[move_num-1])
+                       transdelta = min(0.0, (-transdelta if leela.whoseturn() == "black" else transdelta))
 
-                if delta <= -args.analyze_threshold:
-                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,stats,this_move)
+                if transdelta <= -analyze_threshold:
+                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move)
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
-                if delta <= -args.variations_threshold or move_num in comment_requests_variations:
+                if transdelta <= -variations_threshold or move_num in comment_requests_variations:
                    needs_variations[move_num-1] = (prev_stats,prev_move_list)
                    if move_num not in comment_requests_variations:
                        variations_tasks += 1
 
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
 
-                if (move_num-1) in comment_requests_analyze or delta <= -args.analyze_threshold:
+                if (move_num-1) in comment_requests_analyze or transdelta <= -analyze_threshold:
                     (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
                     C.previous()
                     annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)

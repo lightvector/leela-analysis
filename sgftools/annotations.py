@@ -45,26 +45,26 @@ def format_winrate(stats,move_list,board_size):
 
     return comment
 
-def format_delta_info(delta, stats, this_move):
+def format_delta_info(delta, transdelta, stats, this_move):
     comment = ""
     LB_values = []
-    if(delta <= -0.10):
+    if(transdelta <= -0.200):
         comment += "==========================\n"
-        comment += "BLUNDER!! (delta %.2f%%)\n" % (delta * 100)
+        comment += "BIG MISTAKE!!! (delta %.2f%%)\n" % (delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
-    elif(delta <= -0.04):
+    elif(transdelta <= -0.075):
         comment += "==========================\n"
         comment += "MISTAKE! (delta %.2f%%)\n" % (delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
-    elif(delta <= -0.02):
+    elif(transdelta <= -0.030):
         comment += "==========================\n"
         comment += "INACCURACY (delta %.2f%%)\n" % (delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
-    elif(delta <= -0.001):
-        comment += "(delta %.2f%%)\n" % (delta * 100)
+    elif(transdelta <= -0.005):
+        comment += "Leela slightly prefers another move (delta %.2f%%).\n" % (delta * 100)
 
     comment += "\n"
     return (comment,LB_values)
