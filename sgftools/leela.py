@@ -23,11 +23,13 @@ def check_stream(fd):
     return ""
 
 class CLI(object):
-    def __init__(self, board_size, executable, seconds_per_search, verbosity):
+    def __init__(self, board_size, executable, is_handicap_game, komi, seconds_per_search, verbosity):
         self.history=[]
         self.executable = executable
         self.verbosity = verbosity
         self.board_size = board_size
+        self.is_handicap_game = is_handicap_game
+        self.komi = komi
         self.seconds_per_search = seconds_per_search + 1 #add one to account for lag time
         self.p = None
 
@@ -68,9 +70,15 @@ class CLI(object):
         self.history = []
 
     def whoseturn(self):
-        if len(self.history) == 0 or 'white' in self.history[-1]:
+        if len(self.history) == 0:
+            if self.is_handicap_game:
+                return "white"
+            else:
+                return "black"
+        elif 'white' in self.history[-1]:
             return 'black'
-        return 'white'
+        else:
+            return 'white'
 
     def parse_status_update(self, message):
         status_regex = r'Nodes: ([0-9]+), Win: ([0-9]+\.[0-9]+)\% \(MC:[0-9]+\.[0-9]+\%\/VN:[0-9]+\.[0-9]+\%\), PV:(( [A-Z][0-9]+)+)'
@@ -97,7 +105,10 @@ class CLI(object):
         self.p = p
 
         time.sleep(5)
+        if self.verbosity > 0:
+            print >>sys.stderr, "Setting board size %d and komi %f to Leela" % (self.board_size, self.komi)
         p.stdin.write('boardsize %d\n' % (self.board_size))
+        p.stdin.write('komi %f\n' % (self.komi))
         p.stdin.write('time_settings 0 %d 1\n' % (self.seconds_per_search))
         time.sleep(1)
         check_stream(p.stderr)

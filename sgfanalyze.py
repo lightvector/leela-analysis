@@ -32,6 +32,25 @@ def graph_winrates(winrates, color, outp_fn):
     plt.ylabel("Win Rate", fontsize=28)
     plt.savefig(outp_fn, dpi=200, format='pdf', bbox_inches='tight')
 
+#Also returns the move played, if any, else None
+def add_moves_to_leela(C,leela):
+    this_move = None
+    if 'W' in C.node.keys():
+        this_move = C.node['W'].data[0]
+        leela.add_move('white', this_move)
+    if 'B' in C.node.keys():
+        this_move = C.node['B'].data[0]
+        leela.add_move('black', this_move)
+    # SGF commands to add black or white stones, often used for setting up handicap and such
+    if 'AB' in C.node.keys():
+        for move in C.node['AB'].data:
+            leela.add_move('black', move)
+    if 'AW' in C.node.keys():
+        for move in C.node['AW'].data:
+            leela.add_move('white', move)
+    return this_move
+
+
 def retry_analysis(fn):
     global RESTART_COUNT
     def wrapped(*args, **kwargs):
@@ -227,6 +246,8 @@ if __name__=='__main__':
                         help="Set a directory to cache partially complete analyses, default ~/.leela_checkpoints")
     parser.add_argument('--restarts', default=2, type=int, metavar="N",
                         help="If leela crashes, retry the analysis step this many times before reporting a failure")
+    parser.add_argument('--wipe-comments', dest='wipe_comments', action='store_true',
+                        help="Remove existing comments from the main line of the SGF file")
     parser.add_argument("SGF_FILE", help="SGF file to analyze")
 
     args = parser.parse_args()
@@ -266,16 +287,41 @@ if __name__=='__main__':
             if 'variations' in C.node['C'].data[0]:
                 comment_requests_variations[move_num] = True
 
-    #Clean out existing comments
-    C = sgf.cursor()
-    cnode = C.node
-    if cnode.has_key('C'):
-        cnode['C'].data[0] = ""
-    while not C.atEnd:
-        C.next()
+    if args.wipe_comments:
+        C = sgf.cursor()
         cnode = C.node
         if cnode.has_key('C'):
             cnode['C'].data[0] = ""
+        while not C.atEnd:
+            C.next()
+            cnode = C.node
+            if cnode.has_key('C'):
+                cnode['C'].data[0] = ""
+
+    C = sgf.cursor()
+    is_handicap_game = False
+    handicap_stone_count = 0
+    if 'HA' in C.node.keys() and int(C.node['HA'].data[0]) > 1:
+        is_handicap_game = True
+        handicap_stone_count = int(C.node['HA'].data[0])
+
+    is_japanese_rules = False
+    if 'RU' in C.node.keys():
+        rules = C.node['RU'].data[0].lower()
+        is_japanese_rules = (rules == 'jp' or rules == 'japanese' or rules == 'japan')
+
+    komi = 7.5
+    if 'KM' in C.node.keys():
+        komi = float(C.node['KM'].data[0])
+        if is_handicap_game and is_japanese_rules:
+            old_komi = komi
+            komi = old_komi + handicap_stone_count
+            print >>sys.stderr, "Adjusting komi from %f to %f in converting Japanese rules with %d handicap to Chinese rules" % (old_komi,komi,handicap_stone_count)
+
+    else:
+        if is_handicap_game:
+            komi = 0.5
+        print >>sys.stderr, "Warning: Komi not specified, assuming %f" % (komi)
 
     (analyze_tasks_initial,variations_tasks_initial) = calculate_tasks_left(sgf, args.analyze_start, args.analyze_end)
     variations_task_probability = 1.0 / (1.0 + args.variations_threshold * 100.0)
@@ -305,6 +351,8 @@ if __name__=='__main__':
 
     leela = leela.CLI(board_size=board_size,
                       executable=args.executable,
+                      is_handicap_game=is_handicap_game,
+                      komi=komi,
                       seconds_per_search=args.seconds_per_search,
                       verbosity=args.verbosity)
 
@@ -323,14 +371,7 @@ if __name__=='__main__':
         while not C.atEnd:
             C.next()
             move_num += 1
-
-            this_move = ""
-            if 'W' in C.node.keys():
-                this_move = C.node['W'].data[0]
-                leela.add_move('white', this_move)
-            if 'B' in C.node.keys():
-                this_move = C.node['B'].data[0]
-                leela.add_move('black', this_move)
+            this_move = add_moves_to_leela(C,leela)
 
             current_player = leela.whoseturn()
             if ((move_num >= args.analyze_start and move_num <= args.analyze_end) or
@@ -383,12 +424,7 @@ if __name__=='__main__':
         while not C.atEnd:
             C.next()
             move_num += 1
-            if 'W' in C.node.keys():
-                this_move = C.node['W'].data[0]
-                leela.add_move('white', this_move)
-            if 'B' in C.node.keys():
-                this_move = C.node['B'].data[0]
-                leela.add_move('black', this_move)
+            add_moves_to_leela(C,leela)
 
             if move_num not in needs_variations:
                 continue

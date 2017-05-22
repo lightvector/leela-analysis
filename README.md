@@ -3,9 +3,17 @@
 This script is a modified version of scripts originally from https://bitbucket.org/mkmatlock/sgftools
 Currently, it's designed to work with Leela 0.10.0, no guarantees about compatibility with any past or future versions.
 
+Added features and modifications from the original scripts:
+
+   * Leela directly finds your game mistakes on its own and gives you alternate variations.
+   * Supports SGFs with handicap and komi. (NOTE: Leela only uses Chinese rules, so if your game was really in Japanese rules,
+     in very close endgames or with certain kinds of sekis the analysis may not be correct).
+   * A variety of minor tweaks to the script interface and the information output to the SGF.
+
 =How to Use=
 First, download and install the "engine only"/"commandline"/"GTP" version of Leela 0.10.0 from:
-https://sjeng.org/leela.html
+
+    https://sjeng.org/leela.html
 
 Clone this repository to a local directory:
 

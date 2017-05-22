@@ -74,11 +74,14 @@ class ProgressBar(object):
         percent_str = "%0.2f" % (100.0 * percent)
         time_remaining = self.estimate_time(percent)
 
+        if self.update_cnt == 0:
+            self.stream.write( "|%s| %6s%% | %s | %s / %s\n" % (bar_str, "pctdone", "timeleft", "done", "total") )
+
         if self.update_cnt % self.frequency == 0:
             if self.message is None:
-                self.stream.write( "\r|%s| %6s%% | %s | %d / %d" % (bar_str, percent_str, time_remaining, value, self.max_value) )
+                self.stream.write( "|%s| %6s%% | %s | %d / %d\n" % (bar_str, percent_str, time_remaining, value, self.max_value) )
             else:
-                self.stream.write( "\r|%s| %6s%% | %s | %d / %d | %s" % (bar_str, percent_str, time_remaining, value, self.max_value, self.message) )
+                self.stream.write( "|%s| %6s%% | %s | %d / %d | %s\n" % (bar_str, percent_str, time_remaining, value, self.max_value, self.message) )
         self.update_cnt += 1
 
     def set_message(self, message):
