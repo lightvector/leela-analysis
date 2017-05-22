@@ -270,7 +270,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
     record(tree)
 
 
-def calculate_tasks_left(sgf, start_m, end_n):
+def calculate_tasks_left(sgf, start_m, end_n, comment_requests_analyze, comment_requests_variations):
     C = sgf.cursor()
     move_num = 0
     analyze_tasks = 0
@@ -281,12 +281,10 @@ def calculate_tasks_left(sgf, start_m, end_n):
         analysis_mode = None
         if move_num >= args.analyze_start and move_num <= args.analyze_end:
             analysis_mode='analyze'
-
-        if 'C' in C.node.keys():
-            if 'variations' in C.node['C'].data[0]:
-                analysis_mode='variations'
-            elif 'analyze' in C.node['C'].data[0]:
-                analysis_mode='analyze'
+        if move_num in comment_requests_analyze or (move_num-1) in comment_requests_analyze or (move_num-1) in comment_requests_variations:
+            analysis_mode='analyze'
+        if move_num in comment_requests_variations:
+            analysis_mode='variations'
 
         if analysis_mode=='analyze':
             analyze_tasks += 1
@@ -402,10 +400,10 @@ if __name__=='__main__':
             komi = 0.5
         print >>sys.stderr, "Warning: Komi not specified, assuming %f" % (komi)
 
-    (analyze_tasks_initial,variations_tasks_initial) = calculate_tasks_left(sgf, args.analyze_start, args.analyze_end)
+    (analyze_tasks_initial,variations_tasks_initial) = calculate_tasks_left(sgf, args.analyze_start, args.analyze_end, comment_requests_analyze, comment_requests_variations)
     variations_task_probability = 1.0 / (1.0 + args.variations_threshold * 100.0)
     analyze_tasks_initial_done = 0
-    variations_tasks = 0
+    variations_tasks = variations_tasks_initial
     variations_tasks_done = 0
     def approx_tasks_done():
         return (
@@ -448,6 +446,7 @@ if __name__=='__main__':
         C = sgf.cursor()
         prev_stats = {}
         prev_move_list = []
+        has_prev = False
 
         leela.start()
         add_moves_to_leela(C,leela)
@@ -455,11 +454,12 @@ if __name__=='__main__':
             C.next()
             move_num += 1
             this_move = add_moves_to_leela(C,leela)
-
             current_player = leela.whoseturn()
             if ((move_num >= args.analyze_start and move_num <= args.analyze_end) or
                 (move_num in comment_requests_analyze) or
-                (move_num in comment_requests_variations)):
+                ((move_num-1) in comment_requests_analyze) or
+                (move_num in comment_requests_variations) or
+                ((move_num-1) in comment_requests_variations)):
                 stats, move_list = do_analyze(leela,args.verbosity)
 
                 if 'winrate' in stats and stats['visits'] > 100:
@@ -481,14 +481,14 @@ if __name__=='__main__':
                     (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move)
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
-                if transdelta <= -variations_threshold or move_num in comment_requests_variations:
+                if has_prev and (transdelta <= -variations_threshold or (move_num-1) in comment_requests_variations):
                    needs_variations[move_num-1] = (prev_stats,prev_move_list)
-                   if move_num not in comment_requests_variations:
+                   if (move_num-1) not in comment_requests_variations:
                        variations_tasks += 1
 
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
 
-                if (move_num-1) in comment_requests_analyze or transdelta <= -analyze_threshold:
+                if has_prev and ((move_num-1) in comment_requests_analyze or (move_num-1) in comment_requests_variations or transdelta <= -analyze_threshold):
                     (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
                     C.previous()
                     annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
@@ -496,9 +496,14 @@ if __name__=='__main__':
 
                 prev_stats = stats
                 prev_move_list = move_list
+                has_prev = True
 
                 analyze_tasks_initial_done += 1
                 refresh_pb()
+            else:
+                prev_stats = {}
+                prev_move_list = []
+                has_prev = False
 
         leela.stop()
         leela.clear_history()
@@ -527,6 +532,7 @@ if __name__=='__main__':
 
             do_variations(C, leela, stats, move_list, args.nodes_per_variation, board_size, next_game_move, args.verbosity)
             variations_tasks_done += 1
+            refresh_pb()
 
     except:
         traceback.print_exc()
