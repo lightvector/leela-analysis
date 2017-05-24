@@ -8,7 +8,7 @@ import math
 from sgftools import gotools, leela, annotations, progressbar, sgflib
 
 # Stdev of bell curve whose cdf we take to be the "real" probability given Leela's winrate
-DEFAULT_STDEV = 0.20
+DEFAULT_STDEV = 0.23
 
 RESTART_COUNT=1
 
@@ -140,7 +140,7 @@ def retry_analysis(fn):
     return wrapped
 
 @retry_analysis
-def do_analyze(leela, verbosity):
+def do_analyze(leela, base_dir, verbosity):
     ckpt_hash = 'analyze_' + leela.history_hash() + "_" + str(leela.seconds_per_search) + "sec"
     ckpt_fn = os.path.join(base_dir, ckpt_hash)
     if verbosity > 2:
@@ -162,7 +162,7 @@ def do_analyze(leela, verbosity):
 
 # move_list is from a call to do_analyze
 # Iteratively expands a tree of moves by expanding on the leaf with the highest "probability of reaching".
-def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, game_move, verbosity):
+def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, game_move, base_dir, verbosity):
     if 'bookmoves' in stats or len(move_list) <= 0:
         return
 
@@ -211,7 +211,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
     def search(node):
         for mv in node["history"]:
             leela.add_move(leela.whoseturn(),mv)
-        stats, move_list = do_analyze(leela,verbosity)
+        stats, move_list = do_analyze(leela,base_dir,verbosity)
         expand(node,stats,move_list)
 
         for mv in node["history"]:
@@ -421,7 +421,6 @@ if __name__=='__main__':
     transform_winrate = winrate_transformer(DEFAULT_STDEV, args.verbosity)
     analyze_threshold = transform_winrate(0.5 + 0.5 * args.analyze_threshold) - transform_winrate(0.5 - 0.5 * args.analyze_threshold)
     variations_threshold = transform_winrate(0.5 + 0.5 * args.variations_threshold) - transform_winrate(0.5 - 0.5 * args.variations_threshold)
-
     print >>sys.stderr, "Executing approx %.0f analysis steps" % (approx_tasks_max())
 
     pb = progressbar.ProgressBar(max_value=approx_tasks_max())
@@ -460,7 +459,7 @@ if __name__=='__main__':
                 ((move_num-1) in comment_requests_analyze) or
                 (move_num in comment_requests_variations) or
                 ((move_num-1) in comment_requests_variations)):
-                stats, move_list = do_analyze(leela,args.verbosity)
+                stats, move_list = do_analyze(leela,base_dir,args.verbosity)
 
                 if 'winrate' in stats and stats['visits'] > 100:
                     collected_winrates[move_num] = (current_player, stats['winrate'])
@@ -478,7 +477,7 @@ if __name__=='__main__':
                        transdelta = min(0.0, (-transdelta if leela.whoseturn() == "black" else transdelta))
 
                 if transdelta <= -analyze_threshold:
-                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move)
+                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move,board_size)
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
                 if has_prev and (transdelta <= -variations_threshold or (move_num-1) in comment_requests_variations):
@@ -530,7 +529,7 @@ if __name__=='__main__':
                     next_game_move = C.node['B'].data[0]
                 C.previous()
 
-            do_variations(C, leela, stats, move_list, args.nodes_per_variation, board_size, next_game_move, args.verbosity)
+            do_variations(C, leela, stats, move_list, args.nodes_per_variation, board_size, next_game_move, base_dir, args.verbosity)
             variations_tasks_done += 1
             refresh_pb()
 
