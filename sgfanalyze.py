@@ -8,7 +8,7 @@ import math
 from sgftools import gotools, leela, annotations, progressbar, sgflib
 
 # Stdev of bell curve whose cdf we take to be the "real" probability given Leela's winrate
-DEFAULT_STDEV = 0.23
+DEFAULT_STDEV = 0.22
 
 RESTART_COUNT=1
 
@@ -303,10 +303,10 @@ if __name__=='__main__':
     parser.add_argument('--stop', dest='analyze_end', default=1000, type=int, metavar="MOVENUM",
                         help="Analyze game stopping at this move (default=1000)")
 
-    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.025, type=float, metavar="T",
-                        help="Display analysis on moves losing approx at least this much win rate when the game is close (default=0.02)")
-    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.025, type=float, metavar="T",
-                        help="Explore variations on moves losing approx at least this much win rate when the game is close (default=0.02)")
+    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.030, type=float, metavar="T",
+                        help="Display analysis on moves losing approx at least this much win rate when the game is close (default=0.03)")
+    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.030, type=float, metavar="T",
+                        help="Explore variations on moves losing approx at least this much win rate when the game is close (default=0.03)")
 
     parser.add_argument('--secs-per-search', dest='seconds_per_search', default=10, type=float, metavar="S",
                         help="How many seconds to use per search (default=10)")

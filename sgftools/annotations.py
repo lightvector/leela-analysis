@@ -50,17 +50,17 @@ def format_delta_info(delta, transdelta, stats, this_move, board_size):
     LB_values = []
     if(transdelta <= -0.200):
         comment += "==========================\n"
-        comment += "BIG MISTAKE!!! (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
+        comment += "Big Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
     elif(transdelta <= -0.075):
         comment += "==========================\n"
-        comment += "MISTAKE! (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
+        comment += "Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
-    elif(transdelta <= -0.035):
+    elif(transdelta <= -0.040):
         comment += "==========================\n"
-        comment += "INACCURACY (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
+        comment += "Inaccuracy? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
         LB_values.append("%s:%s" % (this_move,":("))
     elif(transdelta <= -0.005):
