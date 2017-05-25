@@ -12,10 +12,10 @@ Added features and modifications from the original scripts:
      in very close endgames or with certain kinds of sekis the analysis may not be correct).
    * A variety of minor tweaks to the script interface and the information output to the SGF.
 
-Note that it is not uncommon for Leela to mess up on tactical situations and give poor suggestions, particularly when it hasn't
+WARNING: It is not uncommon for Leela to mess up on tactical situations and give poor suggestions, particularly when it hasn't
 realized the life or death of a group yet that is actually already alive or dead. Like all MC bots, it also has a somewhat different
 notion than humans of how to wrap up a won game and what moves (despite still being winning) are "mistakes". Take the analysis with
-a grain of salt.
+many grains of salt.
 
 ### How to Use
 First, download and install the "engine only"/"commandline"/"GTP" version of Leela 0.10.0 from:
