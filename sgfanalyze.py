@@ -317,7 +317,7 @@ if __name__=='__main__':
     parser.add_argument('-v','--verbosity', default=0, type=int, metavar="V",
                         help="Set the verbosity level, 0: progress only, 1: progress+status, 2: progress+status+state")
     required.add_argument('--leela', dest='executable', required=True, metavar="CMD",
-                        help="Path or command to run Leela executable")
+                        help="Command to run Leela executable")
     parser.add_argument('--cache', dest='ckpt_dir', metavar="DIR",
                         default=os.path.expanduser('~/.leela_checkpoints'),
                         help="Set a directory to cache partially complete analyses, default ~/.leela_checkpoints")
