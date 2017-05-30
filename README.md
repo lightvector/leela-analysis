@@ -23,8 +23,8 @@ https://sjeng.org/leela.html
 
 Clone this repository to a local directory:
 
-    git clone https://github.com/lightvector/leela_analysis
-    cd leela_analysis
+    git clone https://github.com/lightvector/leela-analysis
+    cd leela-analysis
 
 Then simply run the script to analyze a game, providing the path to the leela executable, such as Leela0100GTP.exe.
 
