@@ -52,17 +52,17 @@ def format_delta_info(delta, transdelta, stats, this_move, board_size):
         comment += "==========================\n"
         comment += "Big Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,":("))
+        LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.075):
         comment += "==========================\n"
         comment += "Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,":("))
+        LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.040):
         comment += "==========================\n"
         comment += "Inaccuracy? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,":("))
+        LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.005):
         comment += "Leela slightly dislikes %s (delta %.2f%%).\n" % (format_pos(this_move,board_size), delta * 100)
 
