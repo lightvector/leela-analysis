@@ -26,7 +26,7 @@ Clone this repository to a local directory:
     git clone https://github.com/lightvector/leela-analysis
     cd leela-analysis
 
-Then simply run the script to analyze a game, providing the command to run to the leela executable, such as ./Leela0100GTP.exe.
+Then simply run the script to analyze a game, providing the command to run to the leela executable, such as ./Leela0100GTP.exe or ./leela_0100_linux_x64.
 
     sgfanalyze.py my_game.sgf --leela /PATH/TO/LEELA.exe > my_game_analyzed.sgf
 
