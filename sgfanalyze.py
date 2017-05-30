@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 import os, sys
 import argparse
 import hashlib
@@ -133,7 +133,7 @@ def retry_analysis(fn):
         for i in xrange(RESTART_COUNT+1):
             try:
                 return fn(*args, **kwargs)
-            except Exception, e:
+            except Exception as e:
                 if i+1 == RESTART_COUNT+1:
                     raise
                 print >>sys.stderr, "Error in leela, retrying analysis..."
