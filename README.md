@@ -36,3 +36,19 @@ an hour or two to run.
 
 Run the script with --help to see other options you can configure. You can change the amount of time Leela will analyze for, change how
 much effort it puts in to making variations versus just analyzing the main game, or select just a subrange of the game to analyze.
+
+### Troubleshooting
+
+If you get an "OSError: [Errno 2] No such file or directory" error or you get an "OSError: [Errno 8] Exec format error" originating from "subprocess.py",
+check to make sure the command you provided for running Leela is correct. The former usually happens if you provided the wrong path, the latter if
+you provided the wrong Leela executable for your OS.
+
+If get an error like "WARNING: analysis stats missing data" that causes the analysis to consistently fail at a particular spot in a given sgf file and only
+output partial results, there is probably a bug in the script that causes it not to be able to parse a particular output by Leela in that position. Feel
+free to open an issue and provide the SGF file that causes the failure. You can also run with "-v 3" to enable super-verbose output and see exactly what
+Leela is outputting on that position.
+
+If you are getting an import error regarding "fcntl" or some other module, note that the script probably doesn't currently work on Windows due to
+Windows missing the "fcntl" library needed for non-blocking IO with Leela. However, you can try here for an experimental version that replaces that
+library with the use threads, which might work on Windows but has not been tested:
+https://github.com/lightvector/leela-analysis/tree/no-fcntl
