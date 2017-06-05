@@ -2,33 +2,69 @@ import os
 import sys
 import re
 import time
-import fcntl
 import hashlib
+from Queue import Queue, Empty
+from threading import Thread
 from subprocess import Popen, PIPE, STDOUT
 
-def set_non_blocking(fd):
-    """
-    Set the file description of the given file descriptor to
-    non-blocking.
-    """
-    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-    flags = flags | os.O_NONBLOCK
-    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+status_regex = r'MC winrate=([0-9]+\.[0-9]+), NN eval=([0-9]+\.[0-9]+), score=([BW]\+[0-9]+\.[0-9]+)'
+move_regex = r'^([A-Z][0-9]+) -> +([0-9]+) \(W: +(\-?[0-9]+\.[0-9]+)\%\) \(U: +(\-?[0-9]+\.[0-9]+)\%\) \(V: +([0-9]+\.[0-9]+)\%: +([0-9]+)\) \(N: +([0-9]+\.[0-9]+)\%\) PV: (.*)$'
+best_regex = r'([0-9]+) visits, score (\-? ?[0-9]+\.[0-9]+)\% \(from \-? ?[0-9]+\.[0-9]+\%\) PV: (.*)'
+stats_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
+bookmove_regex = r'([0-9]+) book moves, ([0-9]+) total positions'
+finished_regex = r'= ([A-Z][0-9]+)'
 
-#Suppresses io errors
-def readline(fd):
-    try:
-        return fd.readline()
-    except IOError:
-        pass
-    return ""
+#Start a thread that perpetually reads from the given file descriptor
+#and pushes the result on to a queue, to simulate non-blocking io. We
+#could just use fcntl and make the file descriptor non-blocking, but
+#fcntl isn't available on windows so we do this horrible hack.
+class ReaderThread:
+    def __init__(self,fd):
+        self.queue = Queue()
+        self.fd = fd
+        self.stopped = False
+    def stop(self):
+        #No lock since this is just a simple bool that only ever changes one way
+        self.stopped = True
+    def loop(self):
+        while not self.stopped and not self.fd.closed:
+            line = None
+            #fd.readline() should return due to eof once the process is closed
+            #at which point
+            try:
+                line = self.fd.readline()
+            except IOError:
+                time.sleep(0.2)
+                pass
+            if line is not None and len(line) > 0:
+                self.queue.put(line)
 
-def readall(fd):
-    try:
-        return fd.read()
-    except IOError:
-        pass
-    return ""
+    def readline(self):
+        try:
+            line = self.queue.get_nowait()
+        except Empty:
+            return ""
+        return line
+
+    def read_all_lines(self):
+        lines = []
+        while True:
+            try:
+                line = self.queue.get_nowait()
+            except Empty:
+                break
+            lines.append(line)
+        return lines
+
+
+def start_reader_thread(fd):
+    rt = ReaderThread(fd)
+    def begin_loop():
+        rt.loop()
+
+    t = Thread(target=begin_loop)
+    t.start()
+    return rt
 
 class CLI(object):
     def __init__(self, board_size, executable, is_handicap_game, komi, seconds_per_search, verbosity):
@@ -103,8 +139,8 @@ class CLI(object):
 
     # Drain all remaining stdout and stderr current contents
     def drain(self):
-        so = readall(self.p.stdout)
-        se = readall(self.p.stderr)
+        so = self.stdout_thread.read_all_lines()
+        se = self.stderr_thread.read_all_lines()
         return (so,se)
 
     # Send command and wait for ack
@@ -113,12 +149,12 @@ class CLI(object):
         sleep_per_try = 0.1
         tries = 0
         success_count = 0
-        while tries * sleep_per_try <= timeout:
+        while tries * sleep_per_try <= timeout and self.p is not None:
             time.sleep(sleep_per_try)
             tries += 1
             # Readline loop
             while True:
-                s = readline(self.p.stdout)
+                s = self.stdout_thread.readline()
                 # Leela follows GTP and prints a line starting with "=" upon success.
                 if s.strip() == '=':
                     success_count += 1
@@ -138,9 +174,9 @@ class CLI(object):
             print >>sys.stderr, "Starting leela..."
 
         p = Popen([self.executable, '--gtp', '--noponder'] + xargs, stdout=PIPE, stdin=PIPE, stderr=PIPE)
-        set_non_blocking(p.stdout)
-        set_non_blocking(p.stderr)
         self.p = p
+        self.stdout_thread = start_reader_thread(p.stdout)
+        self.stderr_thread = start_reader_thread(p.stderr)
 
         time.sleep(2)
         if self.verbosity > 0:
@@ -155,14 +191,22 @@ class CLI(object):
 
         if self.p is not None:
             p = self.p
+            stdout_thread = self.stdout_thread
+            stderr_thread = self.stderr_thread
             self.p = None
-            p.stdin.write('exit\n')
+            self.stdout_thread = None
+            self.stderr_thread = None
+            stdout_thread.stop()
+            stderr_thread.stop()
+            try:
+                p.stdin.write('exit\n')
+            except IOError:
+                pass
+            time.sleep(0.1)
             try:
                 p.terminate()
             except OSError:
                 pass
-            readall(p.stdout)
-            readall(p.stderr)
 
     def playmove(self, pos):
         color = self.whoseturn()
@@ -175,7 +219,7 @@ class CLI(object):
     def boardstate(self):
         self.send_command("showboard",drain=False)
         (so,se) = self.drain()
-        return se
+        return "".join(se)
 
     def goto_position(self):
         count = len(self.history)
@@ -198,28 +242,28 @@ class CLI(object):
         updated = 0
         stderr = []
         stdout = []
-        finished_regex = '= [A-Z][0-9]+'
 
-        while updated < 20 + self.seconds_per_search * 2:
+        while updated < 20 + self.seconds_per_search * 2 and self.p is not None:
             O,L = self.drain()
-            stdout.append(O)
-            stderr.append(L)
+            stdout.extend(O)
+            stderr.extend(L)
 
-            D = self.parse_status_update(L)
+            D = self.parse_status_update("".join(L))
             if 'visits' in D:
                 if self.verbosity > 0:
                     print >>sys.stderr, "Visited %d positions" % (D['visits'])
                 updated = 0
             updated += 1
             if re.search(finished_regex, ''.join(stdout)) is not None:
-                break
+                if re.search(stats_regex, ''.join(stderr)) is not None or re.search(bookmove_regex, ''.join(stderr)) is not None:
+                    break
             time.sleep(1)
 
         p.stdin.write("\n")
         time.sleep(1)
         O,L = self.drain()
-        stderr = ''.join(stderr) + O
-        stdout = ''.join(stdout) + L
+        stdout.extend(O)
+        stderr.extend(L)
 
         stats, move_list = self.parse(stdout, stderr)
         if self.verbosity > 0:
@@ -246,23 +290,16 @@ class CLI(object):
     def parse(self, stdout, stderr):
         if self.verbosity > 2:
             print >>sys.stderr, "LEELA STDOUT"
-            print >>sys.stderr, stdout
+            print >>sys.stderr, "".join(stdout)
             print >>sys.stderr, "END OF LEELA STDOUT"
             print >>sys.stderr, "LEELA STDERR"
-            print >>sys.stderr, stderr
+            print >>sys.stderr, "".join(stderr)
             print >>sys.stderr, "END OF LEELA STDERR"
-
-        status_regex = r'MC winrate=([0-9]+\.[0-9]+), NN eval=([0-9]+\.[0-9]+), score=([BW]\+[0-9]+\.[0-9]+)'
-        move_regex = r'^([A-Z][0-9]+) -> +([0-9]+) \(W: +(\-?[0-9]+\.[0-9]+)\%\) \(U: +(\-?[0-9]+\.[0-9]+)\%\) \(V: +([0-9]+\.[0-9]+)\%: +([0-9]+)\) \(N: +([0-9]+\.[0-9]+)\%\) PV: (.*)$'
-        best_regex = r'([0-9]+) visits, score (\-? ?[0-9]+\.[0-9]+)\% \(from \-? ?[0-9]+\.[0-9]+\%\) PV: (.*)'
-        stats_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
-        bookmove_regex = r'([0-9]+) book moves, ([0-9]+) total positions'
 
         stats = {}
         move_list = []
 
-        finished_regex = r'= ([A-Z][0-9]+)'
-        M = re.search(finished_regex, stdout)
+        M = re.search(finished_regex, "".join(stdout))
         if M is not None:
             stats['chosen'] = self.parse_position(M.group(1))
 
@@ -272,7 +309,7 @@ class CLI(object):
 
         finished=False
         summarized=False
-        for line in stderr.split('\n'):
+        for line in stderr:
             line = line.strip()
             if line.startswith('================'):
                 finished=True

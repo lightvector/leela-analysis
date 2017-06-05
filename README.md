@@ -11,6 +11,8 @@ Added features and modifications from the original scripts:
    * Supports SGFs with handicap and komi. (NOTE: Leela only uses Chinese rules, so if your game was really in Japanese rules,
      in very close endgames or with certain kinds of sekis the analysis may not be correct).
    * A variety of minor tweaks to the script interface and the information output to the SGF.
+   * Cache takes into account the search limits (Leela will not use its past results if they were done with less search time).
+   * Removed dependence on fcntl library - scripts now work on Windows!
 
 WARNING: It is not uncommon for Leela to mess up on tactical situations and give poor suggestions, particularly when it hasn't
 realized the life or death of a group yet that is actually already alive or dead. Like all MC bots, it also has a somewhat different
@@ -47,8 +49,3 @@ If get an error like "WARNING: analysis stats missing data" that causes the anal
 output partial results, there is probably a bug in the script that causes it not to be able to parse a particular output by Leela in that position. Feel
 free to open an issue and provide the SGF file that causes the failure. You can also run with "-v 3" to enable super-verbose output and see exactly what
 Leela is outputting on that position.
-
-If you are getting an import error regarding "fcntl" or some other module, note that the script probably doesn't currently work on Windows due to
-Windows missing the "fcntl" library needed for non-blocking IO with Leela. However, you can try here for an experimental version that replaces that
-library with the use threads, which might work on Windows but has not been tested:
-https://github.com/lightvector/leela-analysis/tree/no-fcntl
