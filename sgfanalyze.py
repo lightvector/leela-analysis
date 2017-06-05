@@ -325,6 +325,10 @@ if __name__=='__main__':
                         help="If leela crashes, retry the analysis step this many times before reporting a failure")
     parser.add_argument('--wipe-comments', dest='wipe_comments', action='store_true',
                         help="Remove existing comments from the main line of the SGF file")
+    parser.add_argument('--skip-white', dest='skip_white', action='store_true',
+                        help="Do not display analysis or explore variations for white mistakes")
+    parser.add_argument('--skip-black', dest='skip_black', action='store_true',
+                        help="Do not display analysis or explore variations for black mistakes")
     parser.add_argument("SGF_FILE", help="SGF file to analyze")
 
     args = parser.parse_args()
@@ -454,6 +458,7 @@ if __name__=='__main__':
             move_num += 1
             this_move = add_moves_to_leela(C,leela)
             current_player = leela.whoseturn()
+            prev_player = "white" if current_player == "black" else "black"
             if ((move_num >= args.analyze_start and move_num <= args.analyze_end) or
                 (move_num in comment_requests_analyze) or
                 ((move_num-1) in comment_requests_analyze) or
@@ -481,17 +486,19 @@ if __name__=='__main__':
                     annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
                 if has_prev and (transdelta <= -variations_threshold or (move_num-1) in comment_requests_variations):
-                   needs_variations[move_num-1] = (prev_stats,prev_move_list)
-                   if (move_num-1) not in comment_requests_variations:
-                       variations_tasks += 1
+                    if not (args.skip_white and prev_player == "white") and not (args.skip_black and prev_player == "black"):
+                        needs_variations[move_num-1] = (prev_stats,prev_move_list)
+                        if (move_num-1) not in comment_requests_variations:
+                            variations_tasks += 1
 
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
 
                 if has_prev and ((move_num-1) in comment_requests_analyze or (move_num-1) in comment_requests_variations or transdelta <= -analyze_threshold):
-                    (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
-                    C.previous()
-                    annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
-                    C.next()
+                    if not (args.skip_white and prev_player == "white") and not (args.skip_black and prev_player == "black"):
+                        (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)
+                        C.previous()
+                        annotations.annotate_sgf(C, analysis_comment, lb_values, tr_values)
+                        C.next()
 
                 prev_stats = stats
                 prev_move_list = move_list
