@@ -149,7 +149,7 @@ class CLI(object):
         sleep_per_try = 0.1
         tries = 0
         success_count = 0
-        while tries * sleep_per_try <= timeout:
+        while tries * sleep_per_try <= timeout and self.p is not None:
             time.sleep(sleep_per_try)
             tries += 1
             # Readline loop
@@ -196,13 +196,17 @@ class CLI(object):
             self.p = None
             self.stdout_thread = None
             self.stderr_thread = None
-            p.stdin.write('exit\n')
+            stdout_thread.stop()
+            stderr_thread.stop()
+            try:
+                p.stdin.write('exit\n')
+            except IOError:
+                pass
+            time.sleep(0.1)
             try:
                 p.terminate()
             except OSError:
                 pass
-            stdout_thread.stop()
-            stderr_thread.stop()
 
     def playmove(self, pos):
         color = self.whoseturn()
@@ -239,7 +243,7 @@ class CLI(object):
         stderr = []
         stdout = []
 
-        while updated < 20 + self.seconds_per_search * 2:
+        while updated < 20 + self.seconds_per_search * 2 and self.p is not None:
             O,L = self.drain()
             stdout.extend(O)
             stderr.extend(L)
