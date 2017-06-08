@@ -27,6 +27,9 @@ def format_variation(cursor, seq):
     insert_sequence(cursor, mv_seq, mv_data, format_analysis)
 
 def format_pos(pos,board_size):
+    #In an sgf file, passes are the empty string or tt
+    if pos == "" or pos == "tt":
+        return "pass"
     if len(pos) != 2:
         return pos
     return "ABCDEFGHJKLMNOPQRSTUVXYZ"[ord(pos[0]) - ord('a')] + str(board_size - (ord(pos[1]) - ord('a')))
@@ -83,9 +86,10 @@ def format_analysis(stats, move_list, this_move):
         for L, mv in zip(abet, move_list):
             comment += "%s -> Win%%: %.2f%% (%d visits) \n" % (L, mv['winrate'] * 100, mv['visits'])
 
-    LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list)]
+    #Check for pos being "" or "tt", values which indicate passes, and don't attempt to display markers for them
+    LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list) if mv['pos'] != "" and mv['pos'] != "tt"]
     mvs = [mv['pos'] for mv in move_list]
-    TR_values = [this_move] if this_move not in mvs and this_move is not None else []
+    TR_values = [this_move] if this_move not in mvs and this_move is not None and this_move != "" and this_move != "tt" else []
     return (comment,LB_values,TR_values)
 
 def annotate_sgf(cursor, comment, LB_values, TR_values):

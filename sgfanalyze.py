@@ -474,16 +474,16 @@ if __name__=='__main__':
 
                 delta = 0.0
                 transdelta = 0.0
-                if (move_num-1) in collected_best_moves:
+                if 'winrate' in stats and (move_num-1) in collected_best_moves:
                     if(this_move != collected_best_moves[move_num-1]):
                        delta = stats['winrate'] - collected_best_move_winrates[move_num-1]
                        delta = min(0.0, (-delta if leela.whoseturn() == "black" else delta))
                        transdelta = transform_winrate(stats['winrate']) - transform_winrate(collected_best_move_winrates[move_num-1])
                        transdelta = min(0.0, (-transdelta if leela.whoseturn() == "black" else transdelta))
 
-                if transdelta <= -analyze_threshold:
-                    (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move,board_size)
-                    annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
+                    if transdelta <= -analyze_threshold:
+                        (delta_comment,delta_lb_values) = annotations.format_delta_info(delta,transdelta,stats,this_move,board_size)
+                        annotations.annotate_sgf(C, delta_comment, delta_lb_values, [])
 
                 if has_prev and (transdelta <= -variations_threshold or (move_num-1) in comment_requests_variations):
                     if not (args.skip_white and prev_player == "white") and not (args.skip_black and prev_player == "black"):

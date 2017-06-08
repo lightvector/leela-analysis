@@ -12,7 +12,7 @@ move_regex = r'^([A-Z][0-9]+) -> +([0-9]+) \(W: +(\-?[0-9]+\.[0-9]+)\%\) \(U: +(
 best_regex = r'([0-9]+) visits, score (\-? ?[0-9]+\.[0-9]+)\% \(from \-? ?[0-9]+\.[0-9]+\%\) PV: (.*)'
 stats_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
 bookmove_regex = r'([0-9]+) book moves, ([0-9]+) total positions'
-finished_regex = r'= ([A-Z][0-9]+)'
+finished_regex = r'= ([A-Z][0-9]+|resign|pass)'
 
 #Start a thread that perpetually reads from the given file descriptor
 #and pushes the result on to a queue, to simulate non-blocking io. We
@@ -84,6 +84,10 @@ class CLI(object):
         return pos
 
     def parse_position(self, pos):
+        #Pass moves are the empty string in sgf files
+        if pos == "pass":
+            return ""
+
         abet = 'abcdefghijklmnopqrstuvwxyz'
         mapped = 'abcdefghjklmnopqrstuvwxyz'
 
@@ -299,10 +303,6 @@ class CLI(object):
         stats = {}
         move_list = []
 
-        M = re.search(finished_regex, "".join(stdout))
-        if M is not None:
-            stats['chosen'] = self.parse_position(M.group(1))
-
         flip_winrate = self.whoseturn() == "white"
         def maybe_flip(winrate):
             return ((1.0 - winrate) if flip_winrate else winrate)
@@ -356,6 +356,13 @@ class CLI(object):
                     stats['visits'] = int(M.group(1))
                     summarized=True
 
+        M = re.search(finished_regex, "".join(stdout))
+        if M is not None:
+            if M.group(1) == "resign":
+                stats['chosen'] = "resign"
+            else:
+                stats['chosen'] = self.parse_position(M.group(1))
+
         if 'bookmoves' in stats and len(move_list)==0:
             move_list.append({'pos': stats['chosen'], 'is_book': True})
         else:
@@ -366,5 +373,9 @@ class CLI(object):
 
             move_list = sorted(move_list, key = (lambda info: 1000000000000000 if info['pos'] == stats['best'] else info['visits']), reverse=True)
             move_list = [info for (i,info) in enumerate(move_list) if i == 0 or info['visits'] > 0]
+
+            #In the case where leela resigns, rather than resigning, just replace with the move Leela did think was best
+            if stats['chosen'] == "resign":
+                stats['chosen'] = stats['best']
 
         return stats, move_list
