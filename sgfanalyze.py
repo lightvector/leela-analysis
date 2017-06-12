@@ -119,8 +119,8 @@ def winrate_transformer(stdev, verbosity):
 
   def cdf(x):
     i = int(math.floor(x * n))
-    if i == n:
-      return lookup[i]
+    if i >= n or i < 0:
+      return x
     excess = x * n - i
     return lookup[i] + excess * (lookup[i+1] - lookup[i])
 
