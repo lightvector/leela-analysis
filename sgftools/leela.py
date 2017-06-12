@@ -281,15 +281,7 @@ class CLI(object):
 
     def to_fraction(self, v):
         v = v.strip()
-        mul=1
-        if v.startswith('-'):
-            mul=-1
-            v = v[1:]
-
-        W, D = v.split('.')
-        if len(W) == 1:
-            W = "0" + W
-        return mul * float('0.' + ''.join([W,D]))
+        return 0.01 * float(v)
 
     def parse(self, stdout, stderr):
         if self.verbosity > 2:
