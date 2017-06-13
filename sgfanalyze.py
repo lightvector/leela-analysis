@@ -239,7 +239,7 @@ def do_variations(C, leela, stats, move_list, nodes_per_variation, board_size, g
 
     def record(node):
         if not node["is_root"]:
-            annotations.annotate_sgf(C, annotations.format_winrate(node["stats"],node["move_list"],board_size), [], [])
+            annotations.annotate_sgf(C, annotations.format_winrate(node["stats"],node["move_list"],board_size,None), [], [])
             move_list_to_display = []
             # Only display info for the principal variation or for lines that have been explored.
             for i in range(len(node["children"])):
@@ -490,8 +490,16 @@ if __name__=='__main__':
                         needs_variations[move_num-1] = (prev_stats,prev_move_list)
                         if (move_num-1) not in comment_requests_variations:
                             variations_tasks += 1
+                next_game_move = None
+                if not C.atEnd:
+                    C.next()
+                    if 'W' in C.node.keys():
+                        next_game_move = C.node['W'].data[0]
+                    if 'B' in C.node.keys():
+                        next_game_move = C.node['B'].data[0]
+                    C.previous()
 
-                annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size), [], [])
+                annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size,next_game_move), [], [])
 
                 if has_prev and ((move_num-1) in comment_requests_analyze or (move_num-1) in comment_requests_variations or transdelta <= -analyze_threshold):
                     if not (args.skip_white and prev_player == "white") and not (args.skip_black and prev_player == "black"):

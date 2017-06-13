@@ -34,15 +34,15 @@ def format_pos(pos,board_size):
         return pos
     return "ABCDEFGHJKLMNOPQRSTUVXYZ"[ord(pos[0]) - ord('a')] + str(board_size - (ord(pos[1]) - ord('a')))
 
-def format_winrate(stats,move_list,board_size):
+def format_winrate(stats,move_list,board_size,next_game_move):
     comment = ""
     if'winrate' in stats:
         comment += "Overall black win%%: %.2f%%\n" % (stats['winrate'] * 100)
     else:
         comment += "Overall black win%: not computed (Leela still in opening book)\n"
 
-    if len(move_list) > 0:
-        comment += "Leela's next move: %s\n" % format_pos(move_list[0]['pos'],board_size)
+    if len(move_list) > 0 and move_list[0]['pos'] != next_game_move:
+        comment += "Leela's preferred next move: %s\n" % format_pos(move_list[0]['pos'],board_size)
     else:
         comment += "\n"
 
