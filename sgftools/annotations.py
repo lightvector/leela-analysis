@@ -26,9 +26,14 @@ def format_variation(cursor, seq):
     mv_data = [('black' if color == 'white' else 'white', stats, mv_list) for color, _mv, stats, mv_list in seq]
     insert_sequence(cursor, mv_seq, mv_data, format_analysis)
 
+def pos_is_pass(pos):
+    if pos == "" or pos == "tt":
+        return True
+    return False
+
 def format_pos(pos,board_size):
     #In an sgf file, passes are the empty string or tt
-    if pos == "" or pos == "tt":
+    if pos_is_pass(pos):
         return "pass"
     if len(pos) != 2:
         return pos
@@ -55,17 +60,20 @@ def format_delta_info(delta, transdelta, stats, this_move, board_size):
         comment += "==========================\n"
         comment += "Big Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,"?"))
+        if not pos_is_pass(this_move):
+            LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.075):
         comment += "==========================\n"
         comment += "Mistake? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,"?"))
+        if not pos_is_pass(this_move):
+            LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.040):
         comment += "==========================\n"
         comment += "Inaccuracy? (%s) (delta %.2f%%)\n" % (format_pos(this_move,board_size), delta * 100)
         comment += "==========================\n"
-        LB_values.append("%s:%s" % (this_move,"?"))
+        if not pos_is_pass(this_move):
+            LB_values.append("%s:%s" % (this_move,"?"))
     elif(transdelta <= -0.005):
         comment += "Leela slightly dislikes %s (delta %.2f%%).\n" % (format_pos(this_move,board_size), delta * 100)
 
@@ -89,7 +97,7 @@ def format_analysis(stats, move_list, this_move):
     #Check for pos being "" or "tt", values which indicate passes, and don't attempt to display markers for them
     LB_values = ["%s:%s" % (mv['pos'],L) for L, mv in zip(abet, move_list) if mv['pos'] != "" and mv['pos'] != "tt"]
     mvs = [mv['pos'] for mv in move_list]
-    TR_values = [this_move] if this_move not in mvs and this_move is not None and this_move != "" and this_move != "tt" else []
+    TR_values = [this_move] if this_move not in mvs and this_move is not None and not pos_is_pass(this_move) else []
     return (comment,LB_values,TR_values)
 
 def annotate_sgf(cursor, comment, LB_values, TR_values):
