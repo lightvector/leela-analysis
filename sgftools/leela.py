@@ -7,8 +7,15 @@ from Queue import Queue, Empty
 from threading import Thread
 from subprocess import Popen, PIPE, STDOUT
 
+update_regex = r'Nodes: ([0-9]+), Win: ([0-9]+\.[0-9]+)\% \(MC:[0-9]+\.[0-9]+\%\/VN:[0-9]+\.[0-9]+\%\), PV:(( [A-Z][0-9]+)+)'
+update_regex_no_vn = r'Nodes: ([0-9]+), Win: ([0-9]+\.[0-9]+)\%, PV:(( [A-Z][0-9]+)+)'
+
 status_regex = r'MC winrate=([0-9]+\.[0-9]+), NN eval=([0-9]+\.[0-9]+), score=([BW]\+[0-9]+\.[0-9]+)'
+status_regex_no_vn = r'MC winrate=([0-9]+\.[0-9]+), score=([BW]\+[0-9]+\.[0-9]+)'
+
 move_regex = r'^([A-Z][0-9]+) -> +([0-9]+) \(W: +(\-?[0-9]+\.[0-9]+)\%\) \(U: +(\-?[0-9]+\.[0-9]+)\%\) \(V: +([0-9]+\.[0-9]+)\%: +([0-9]+)\) \(N: +([0-9]+\.[0-9]+)\%\) PV: (.*)$'
+move_regex_no_vn = r'^([A-Z][0-9]+) -> +([0-9]+) \(U: +(\-?[0-9]+\.[0-9]+)\%\) \(R: +([0-9]+\.[0-9]+)\%: +([0-9]+)\) \(N: +([0-9]+\.[0-9]+)\%\) PV: (.*)$'
+
 best_regex = r'([0-9]+) visits, score (\-? ?[0-9]+\.[0-9]+)\% \(from \-? ?[0-9]+\.[0-9]+\%\) PV: (.*)'
 stats_regex = r'([0-9]+) visits, ([0-9]+) nodes(?:, ([0-9]+) playouts)(?:, ([0-9]+) p/s)'
 bookmove_regex = r'([0-9]+) book moves, ([0-9]+) total positions'
@@ -129,9 +136,10 @@ class CLI(object):
             return 'white'
 
     def parse_status_update(self, message):
-        status_regex = r'Nodes: ([0-9]+), Win: ([0-9]+\.[0-9]+)\% \(MC:[0-9]+\.[0-9]+\%\/VN:[0-9]+\.[0-9]+\%\), PV:(( [A-Z][0-9]+)+)'
+        M = re.match(update_regex, message)
+        if M is None:
+            M = re.match(update_regex_no_vn, message)
 
-        M = re.match(status_regex, message)
         if M is not None:
             visits = int(M.group(1))
             winrate = self.to_fraction(M.group(2))
@@ -317,6 +325,11 @@ class CLI(object):
                 stats['nn_winrate'] = maybe_flip(float(M.group(2)))
                 stats['margin'] = M.group(3)
 
+            M = re.match(status_regex_no_vn, line)
+            if M is not None:
+                stats['mc_winrate'] = maybe_flip(float(M.group(1)))
+                stats['margin'] = M.group(2)
+
             M = re.match(move_regex, line)
             if M is not None:
                 pos = self.parse_position(M.group(1))
@@ -333,6 +346,25 @@ class CLI(object):
                     'pos': pos,
                     'visits': visits,
                     'winrate': W, 'mc_winrate': U, 'nn_winrate': Vp, 'nn_count': Vn,
+                    'policy_prob': N, 'pv': seq
+                }
+                move_list.append(info)
+
+            M = re.match(move_regex_no_vn, line)
+            if M is not None:
+                pos = self.parse_position(M.group(1))
+                visits = int(M.group(2))
+                U = maybe_flip(self.to_fraction(M.group(3)))
+                R = maybe_flip(self.to_fraction(M.group(4)))
+                Rn = int(M.group(5))
+                N = self.to_fraction(M.group(6))
+                seq = M.group(7)
+                seq = [self.parse_position(p) for p in seq.split()]
+
+                info = {
+                    'pos': pos,
+                    'visits': visits,
+                    'winrate': U, 'mc_winrate': U, 'r_winrate': R, 'r_count': Rn,
                     'policy_prob': N, 'pv': seq
                 }
                 move_list.append(info)
@@ -358,7 +390,7 @@ class CLI(object):
         if 'bookmoves' in stats and len(move_list)==0:
             move_list.append({'pos': stats['chosen'], 'is_book': True})
         else:
-            required_keys = ['mc_winrate', 'nn_winrate', 'margin', 'best', 'winrate', 'visits']
+            required_keys = ['mc_winrate', 'margin', 'best', 'winrate', 'visits']
             for k in required_keys:
                 if k not in stats:
                     print >>sys.stderr, "WARNING: analysis stats missing data %s" % (k)

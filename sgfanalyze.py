@@ -295,6 +295,9 @@ def calculate_tasks_left(sgf, start_m, end_n, comment_requests_analyze, comment_
         move_num += 1
     return (analyze_tasks,variations_tasks)
 
+default_analyze_thresh = 0.030
+default_var_thresh = 0.030
+
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     required = parser.add_argument_group('required named arguments')
@@ -303,9 +306,9 @@ if __name__=='__main__':
     parser.add_argument('--stop', dest='analyze_end', default=1000, type=int, metavar="MOVENUM",
                         help="Analyze game stopping at this move (default=1000)")
 
-    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=0.030, type=float, metavar="T",
+    parser.add_argument('--analyze-thresh', dest='analyze_threshold', default=default_analyze_thresh, type=float, metavar="T",
                         help="Display analysis on moves losing approx at least this much win rate when the game is close (default=0.03)")
-    parser.add_argument('--var-thresh', dest='variations_threshold', default=0.030, type=float, metavar="T",
+    parser.add_argument('--var-thresh', dest='variations_threshold', default=default_var_thresh, type=float, metavar="T",
                         help="Explore variations on moves losing approx at least this much win rate when the game is close (default=0.03)")
 
     parser.add_argument('--secs-per-search', dest='seconds_per_search', default=10, type=float, metavar="S",
@@ -356,6 +359,11 @@ if __name__=='__main__':
         board_size = int(C.node['SZ'].data[0])
     else:
         board_size = 19
+
+    if board_size != 19:
+        print >>sys.stderr, "Warning: board size is not 19 so Leela could be much weaker and less accurate"
+        if args.analyze_threshold == default_analyze_thresh or args.variations_threshold == default_var_thresh:
+            print >>sys.stderr, "Warning: Consider also setting --analyze-thresh and --var-thresh higher"
 
     move_num = -1
     C = sgf.cursor()
