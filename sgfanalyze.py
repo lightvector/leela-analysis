@@ -507,8 +507,20 @@ if __name__=='__main__':
                         next_game_move = C.node['B'].data[0]
                     C.previous()
 
-                annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size,next_game_move), [], [])
+                # add triangle marker for next move and "A" label for bot move
+                LB_values = []
+                TR_values = []
+                if next_game_move != None and not annotations.pos_is_pass(next_game_move):
+                    TR_values.append(next_game_move)
+                
+                if len(move_list) > 0:
+                    leela_move = move_list[0]['pos']
+                    if leela_move != next_game_move and not annotations.pos_is_pass(leela_move):
+                        LB_values.append("%s:%s" % (leela_move, "A"))
+    
+                annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size,next_game_move), LB_values, TR_values)
 
+                # add analysis when a bad move was made
                 if has_prev and ((move_num-1) in comment_requests_analyze or (move_num-1) in comment_requests_variations or transdelta <= -analyze_threshold):
                     if not (args.skip_white and prev_player == "white") and not (args.skip_black and prev_player == "black"):
                         (analysis_comment, lb_values, tr_values) = annotations.format_analysis(prev_stats, prev_move_list, this_move)

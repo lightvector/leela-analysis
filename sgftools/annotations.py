@@ -101,13 +101,32 @@ def format_analysis(stats, move_list, this_move):
     return (comment,LB_values,TR_values)
 
 def annotate_sgf(cursor, comment, LB_values, TR_values):
-    cnode = cursor.node
+    cnode = cursor.node  
+
+    LB_existing = []
+    TR_existing = []
+    # ensure there are no duplicates
+    if cnode.has_key("LB"):
+        LB_existing = cnode["LB"]
+        LB_values = list(set(LB_values) - set(LB_existing))
+    if cnode.has_key("TR"): 
+        TR_existing = cnode["TR"]
+        TR_values = list(set(TR_values) - set(TR_existing)) 
+    
     if cnode.has_key('C'):
         cnode['C'].data[0] += comment
     else:
         cnode.addProperty( cnode.makeProperty( 'C', [comment] ) )
 
     if len(LB_values) > 0:
-        cnode.addProperty( cnode.makeProperty( 'LB', LB_values ) )
+        LB_prop = cnode.makeProperty( 'LB', LB_values + LB_existing)
+        if (cnode.has_key("LB")):
+            cnode["LB"] = LB_prop
+        else:
+            cnode.addProperty( LB_prop )
     if len(TR_values) > 0:
-        cnode.addProperty( cnode.makeProperty( 'TR', TR_values ) )
+        TR_prop = cnode.makeProperty( 'TR', TR_values + TR_existing)
+        if (cnode.has_key("TR")):
+            cnode["TR"] = TR_prop
+        else:
+            cnode.addProperty( TR_prop )
