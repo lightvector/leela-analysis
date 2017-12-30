@@ -479,7 +479,7 @@ class Node(Dictionary):
             - property : 'Property'"""
         if self.has_key(property.id):
             self.appendData(property.id, property[:])
-#            raise DuplicatePropertyError
+            raise DuplicatePropertyError
         else:
             self.data[property.id] = property
             self.order.append(property)
