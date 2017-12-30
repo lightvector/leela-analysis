@@ -100,18 +100,29 @@ def format_analysis(stats, move_list, this_move):
     TR_values = [this_move] if this_move not in mvs and this_move is not None and not pos_is_pass(this_move) else []
     return (comment,LB_values,TR_values)
 
+def label_key(label):
+    return label.split(':')[0]
+
+def label_keys(labels):
+    return [label_key(l) for l in labels]
+
 def annotate_sgf(cursor, comment, LB_values, TR_values):
     cnode = cursor.node  
 
     LB_existing = []
     TR_existing = []
+    set_existing = set()
     # ensure there are no duplicates
     if cnode.has_key("LB"):
         LB_existing = cnode["LB"]
-        LB_values = list(set(LB_values) - set(LB_existing))
+        set_existing |= set(label_keys(LB_existing))
+
     if cnode.has_key("TR"): 
         TR_existing = cnode["TR"]
-        TR_values = list(set(TR_values) - set(TR_existing)) 
+        set_existing |= set(TR_existing)
+
+    LB_values = [x for x in LB_values if label_key(x) not in set_existing]
+    TR_values = [x for x in TR_values if x not in set_existing]
     
     if cnode.has_key('C'):
         cnode['C'].data[0] += comment

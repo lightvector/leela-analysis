@@ -332,6 +332,10 @@ if __name__=='__main__':
                         help="Do not display analysis or explore variations for white mistakes")
     parser.add_argument('--skip-black', dest='skip_black', action='store_true',
                         help="Do not display analysis or explore variations for black mistakes")
+    parser.add_argument('--mark-next-move', dest='mark_next', action='store_true',
+                        help="Add a marker for the next move that is played on the main line")
+    parser.add_argument('--mark-leela-suggestion', dest='mark_leela', action='store_true',
+                        help="Add a marker for the move that Leela thinks is best")
     parser.add_argument("SGF_FILE", help="SGF file to analyze")
 
     args = parser.parse_args()
@@ -510,12 +514,12 @@ if __name__=='__main__':
                 # add triangle marker for next move and "A" label for bot move
                 LB_values = []
                 TR_values = []
-                if next_game_move != None and not annotations.pos_is_pass(next_game_move):
+                if args.mark_next and next_game_move != None and not annotations.pos_is_pass(next_game_move):
                     TR_values.append(next_game_move)
                 
                 if len(move_list) > 0:
                     leela_move = move_list[0]['pos']
-                    if leela_move != next_game_move and not annotations.pos_is_pass(leela_move):
+                    if args.mark_leela and leela_move != next_game_move and not annotations.pos_is_pass(leela_move):
                         LB_values.append("%s:%s" % (leela_move, "A"))
     
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size,next_game_move), LB_values, TR_values)
