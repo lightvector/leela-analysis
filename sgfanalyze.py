@@ -21,9 +21,6 @@ def graph_winrates(winrates, color, outp_fn):
     Y = []
     for move_num in sorted(winrates.keys()):
         pl, wr = winrates[move_num]
-
-        if pl != color:
-            wr = 1. - wr
         X.append(move_num)
         Y.append(wr)
 
@@ -516,12 +513,12 @@ if __name__=='__main__':
                 TR_values = []
                 if args.mark_next and next_game_move != None and not annotations.pos_is_pass(next_game_move):
                     TR_values.append(next_game_move)
-                
+
                 if len(move_list) > 0:
                     leela_move = move_list[0]['pos']
                     if args.mark_leela and leela_move != next_game_move and not annotations.pos_is_pass(leela_move):
                         LB_values.append("%s:%s" % (leela_move, "A"))
-    
+
                 annotations.annotate_sgf(C, annotations.format_winrate(stats,move_list,board_size,next_game_move), LB_values, TR_values)
 
                 # add analysis when a bad move was made
