@@ -3,7 +3,7 @@
 This script is a modified version of scripts originally from:
 https://bitbucket.org/mkmatlock/sgftools
 
-Currently, it's designed to work with Leela 0.10.0, no guarantees about compatibility with any past or future versions. It runs on python 2.7.
+Currently, it's designed to work with Leela 0.10.0, or 0.11.0, no guarantees about compatibility with any past or future versions. It runs on python 2.7.
 
 Added features and modifications from the original scripts:
 
