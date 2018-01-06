@@ -24,13 +24,25 @@ def graph_winrates(winrates, color, outp_fn):
         X.append(move_num)
         Y.append(wr)
 
-    plt.figure(1)
-    plt.axhline(0.5, 0, max(winrates.keys()), linestyle='--', color='0.7')
-    plt.plot(X, Y, color='k', marker='+')
+    plt.figure(1, figsize=(7,3.6))
     plt.xlim(0, max(winrates.keys()))
     plt.ylim(0, 1)
-    plt.xlabel("Move Number", fontsize=28)
-    plt.ylabel("Win Rate", fontsize=28)
+    plt.xlabel("Move number", fontsize=12)
+    plt.ylabel("Black's win rate", fontsize=12)
+    plt.yticks([yc/10.0 for yc in range(0,10+1)], fontsize=8)
+    plt.xticks(range(0, max(winrates.keys()), 5), fontsize=8)
+
+    for yc in range(0, 10):
+        plt.axhline(yc/10.0, 0, max(winrates.keys()), linewidth=0.4, color='0.7')
+    for yc in range(0, 40):
+        plt.axhline(yc/40.0, 0, max(winrates.keys()), linewidth=0.1, color='0.7')
+    for xc in range(0, max(winrates.keys()), 50):
+        plt.axvline(xc, 0, 1, linewidth=0.4, color='0.7')
+    for xc in range(0, max(winrates.keys()), 5):
+        plt.axvline(xc, 0, 1, linewidth=0.1, color='0.7')
+
+    plt.plot(X, Y, color='k', marker='.')
+
     plt.savefig(outp_fn, dpi=200, format='pdf', bbox_inches='tight')
 
 #Also returns the move played, if any, else None
