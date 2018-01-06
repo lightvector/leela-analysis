@@ -30,7 +30,7 @@ def graph_winrates(winrates, color, outp_fn):
     plt.xlabel("Move number", fontsize=12)
     plt.ylabel("Black's win rate", fontsize=12)
     plt.yticks([yc/10.0 for yc in range(0,10+1)], fontsize=8)
-    plt.xticks(range(0, max(winrates.keys()), 5), fontsize=8)
+    plt.xticks(range(0, max(winrates.keys()), 10), fontsize=8)
 
     for yc in range(0, 10):
         plt.axhline(yc/10.0, 0, max(winrates.keys()), linewidth=0.4, color='0.7')
