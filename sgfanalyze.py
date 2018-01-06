@@ -29,8 +29,8 @@ def graph_winrates(winrates, color, outp_fn):
     plt.ylim(0, 1)
     plt.xlabel("Move number", fontsize=12)
     plt.ylabel("Black's win rate", fontsize=12)
-    plt.yticks([yc/10.0 for yc in range(0,10+1)], fontsize=8)
-    plt.xticks(range(0, max(winrates.keys()), 10), fontsize=8)
+    plt.yticks([yc/10.0 for yc in range(0,10+1)], fontsize=6)
+    plt.xticks(range(0, max(winrates.keys()), 10), fontsize=6)
 
     for yc in range(0, 10):
         plt.axhline(yc/10.0, 0, max(winrates.keys()), linewidth=0.4, color='0.7')
@@ -41,7 +41,7 @@ def graph_winrates(winrates, color, outp_fn):
     for xc in range(0, max(winrates.keys()), 5):
         plt.axvline(xc, 0, 1, linewidth=0.1, color='0.7')
 
-    plt.plot(X, Y, color='k', marker='.')
+    plt.plot(X, Y, color='k', marker='.', linewidth=0.2, markersize=3)
 
     plt.savefig(outp_fn, dpi=200, format='pdf', bbox_inches='tight')
 
